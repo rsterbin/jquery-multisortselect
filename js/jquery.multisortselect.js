@@ -63,7 +63,7 @@
         var mid = $(this).closest('.multisortselect').data('multisortselect_id');
         var obj = MultiSortSelect.fetch(mid);
         if (obj) {
-            var iid = $(this).closest('li').attr('rel');
+            var iid = $(this).closest('li').data('multisortselect_iid');
             obj.remove(iid);
         }
     };
@@ -156,16 +156,15 @@
         var obj = MultiSortSelect.fetch(mid);
         if (obj) {
             var iid = $(this).closest('li').attr('rel');
-            obj.insertItemById(iid);
+            obj.insertItemById(iid, true);
         }
     };
 
     // }}}
 
     // }}}
-    // {{{ prototype
+    // {{{ Prototype
 
-    // Object prototype
     $.extend(MultiSortSelect.prototype, {
 
         // {{{ Object variables
@@ -173,8 +172,9 @@
         id: 0,
         opts: {},
         cache: '',
+        currentIds: '',
+        allItems: '',
         fetchedAll: false,
-        allItems: [],
         builtShowAll: false,
         $input: '',
         $node: '',
@@ -200,6 +200,10 @@
             this.$input = $el;
             this.$input.data('multisortselect_id', this.id);
             this.opts = $.extend({}, MultiSortSelect.default_opts, opts);
+
+            // Initialize tracking properties
+            this.currentIds = new Array;
+            this.allItems = new Array;
 
             // Initialize the node
             this.$input.wrap('<div class="multisortselect" id="multisortselect_' + this.id + '" />');
@@ -265,7 +269,7 @@
         /**
          * Loads the list with defaults
          *
-         * @param string defaults a comma-separated list of item ids
+         * @param string defaults json describing the items
          */
         loadDefaults: function(defaults) {
             if (typeof(this.opts.backend) == 'string') {
@@ -283,13 +287,45 @@
                     }
                 });
             } else {
-                var item_ids = defaults.split(',');
+                var item_ids = new Array;
+                try {
+                    var item_ids = JSON.parse(defaults);
+                } catch (ex) {
+                    console.log(ex);
+                }
                 for (var i = 0; i < item_ids.length; i++) {
                     if (typeof(this.cache[item_ids[i]]) == 'object') {
                         this.insertItem(this.cache[item_ids[i]], false);
+                    } else {
+                        this.insertItemById(item_ids[i], false);
                     }
                 }
             }
+        },
+
+        // }}}
+        // {{{ getCurrentIndex()
+
+        /**
+         * Returns the index of a given id in the list
+         *
+         * @param  mixed iid the item id
+         * @return int   the index, or -1 if not found
+         */
+        getCurrentIndex: function(iid) {
+            var index = -1;
+            for (var k = 0; k < this.currentIds.length; k++) {
+                var match = false;
+                if (typeof this.opts.match == 'function') {
+                    match = this.opts.match(this.currentIds[k], iid);
+                } else {
+                    match = this.currentIds[k] == iid;
+                }
+                if (match) {
+                    index = k;
+                }
+            }
+            return index;
         },
 
         // }}}
@@ -318,21 +354,21 @@
          */
         insertItem: function(item, update) {
             var iid = item.id;
-            var val = this.$input.val();
-            var bits = val == '' ? new Array : val.split(',');
             if (this.opts.unique) {
-                var i = $.inArray(iid + '', bits);
-                if (i >= 0 && update) {
+                var index = this.getCurrentIndex(iid);
+                if (index >= 0 && update) {
                     return;
                 }
             }
+            this.currentIds.push(iid);
             if (update) {
-                bits.push(iid);
-                this.$input.attr('value', bits.join(','));
+                this.$input.attr('value', JSON.stringify(this.currentIds));
             }
-            var $li = $('<li><div class="multisortselect-item"></div><a href="#" class="multisortselect-remove" title="Remove">&#xd7;</a></li>');
-            $li.attr('id', 'multisortselect_' + this.id + '_' + iid);
-            $li.attr('rel', iid);
+            var $li = $('<li class="multisortselect-list-item">' +
+                    '<div class="multisortselect-item"></div>' +
+                    '<a href="#" class="multisortselect-remove" title="Remove">&#xd7;</a>' +
+                '</li>');
+            $li.data('multisortselect_iid', iid);
             $li.find('.multisortselect-item').html('<i class="icon-sort"></i>' + this.opts.format(item));
             $li.find('.multisortselect-remove').click(MultiSortSelect.eventRemoveItem);
             this.$list.append($li);
@@ -347,22 +383,24 @@
         /**
          * Pushes an item into the list, given its id
          *
-         * @param int iid the item's id
+         * @param int  iid    the item's id
+         * @param bool update whether to update the value
          */
-        insertItemById: function(iid) {
+        insertItemById: function(iid, update) {
             if (typeof(this.cache[iid]) == 'object') {
-                return this.insertItem(this.cache[iid], true);
+                return this.insertItem(this.cache[iid], update);
             } else {
+                var arr = new Array(iid);
                 $.ajax({
                     'type': 'GET',
                     'url': this.opts.backend,
-                    'data': { 'defaults': iid },
+                    'data': { 'defaults': JSON.stringify(arr) },
                     'dataType': 'json',
-                    'context': this,
+                    'context': { obj: this, update: update },
                     'success': function (data) {
                         for (var i = 0; i < data.length; i++) {
-                            this.cacheItem(data[i]);
-                            this.insertItem(data[i], false);
+                            this.obj.cacheItem(data[i]);
+                            this.obj.insertItem(data[i], this.update);
                         }
                     }
                 });
@@ -378,13 +416,17 @@
          * @param string iid the item id
          */
         remove: function(iid) {
-            var bits = this.$input.val().split(',');
-            var i = $.inArray(iid, bits);
-            if (i >= 0) {
-                bits.splice(i, 1);
-                this.$input.attr('value', bits.join(','));
+            var index = this.getCurrentIndex(iid);
+            if (index >= 0) {
+                this.currentIds.splice(index, 1);
+                this.$input.attr('value', JSON.stringify(this.currentIds));
             }
-            this.$list.find('#multisortselect_' + this.id + '_' + iid).remove();
+            this.$list.find('.multisortselect-list-item').each(function () {
+                var $el = $(this);
+                if ($el.data('multisortselect_iid') == iid) {
+                    $el.remove();
+                }
+            });
         },
 
         // }}}
@@ -396,9 +438,10 @@
         reorderInput: function() {
             var newOrder = new Array();
             this.$list.find('li').each(function () {
-                newOrder.push($(this).attr('rel'));
+                newOrder.push($(this).data('multisortselect_iid'));
             });
-            this.$input.attr('value', newOrder.join(','));
+            this.currentIds = newOrder;
+            this.$input.attr('value', JSON.stringify(newOrder));
         },
 
         // }}}

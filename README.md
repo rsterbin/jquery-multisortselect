@@ -3,7 +3,7 @@ jquery-multisortselect
 
 Use this plugin for form elements where you want to add several things,
 possibly by autocomplete, sort them with drag and drop, remove them by clicking
-an x button, and return them in the post as a comma-separated of ids.
+an x button, and return them in the post as a JSON array of ids.
 
 How to use
 ----------
@@ -19,10 +19,10 @@ Important Notes
 
 * You must invoke the plugin on a text input.
 
-* Setting a value on the field will populate the list on load.
+* Setting a JSON value on the field will populate the list on load.
 
-* The value sent on post and used for defaulting is a comma-separated list of
-  ids.  An id must be a number.  Note that duplicate checks (if option `unique`
+* The value sent on post and used for defaulting is a JSON-encoded list of ids.
+  An id must be a scalar value.  Note that duplicate checks (if option `unique`
   is on) are performed using jQuery.inArray().
 
 * Items in the list are represented by objects.  These objects have one
@@ -46,14 +46,15 @@ Important Notes
 Options
 -------
 
-| Option           | Type     | Default                                  | Description                              |
-|:---------------- |:-------- |:---------------------------------------- |:---------------------------------------- |
-| `backend`        | mixed    | _none_                                   | how to get the objects (array or url)    |
-| `format`         | function | `function (item) { return item.label; }` | how to display the element in the list   |
-| `unique`         | boolean  | `true`                                   | whether to allow only one copy of any id |
-| `topClass`       | string   | _none_                                   | set this class on the wrapper div        |
-| `show_all`       | boolean  | `false`                                  | whether to provide a "Show All" button   |
-| `afterAdd`       | function | _none_                                   | do this after each item is added         |
+| Option           | Type     | Default                                  | Description                                        |
+|:---------------- |:-------- |:---------------------------------------- |:-------------------------------------------------- |
+| `backend`        | mixed    | _none_                                   | how to get the objects (array or url)              |
+| `format`         | function | `function (item) { return item.label; }` | how to display the element in the list             |
+| `unique`         | boolean  | `true`                                   | whether to allow only one copy of any id           |
+| `match`          | function | _none_                                   | use this to determine whether two ids are the same |
+| `topClass`       | string   | _none_                                   | set this class on the wrapper div                  |
+| `show_all`       | boolean  | `false`                                  | whether to provide a "Show All" button             |
+| `afterAdd`       | function | _none_                                   | do this after each item is added                   |
 
 Minimum Example
 ---------------
@@ -78,8 +79,6 @@ Requirements
 TODO
 -----
 
- * JSON array of ids
- * Support for non-number ids
  * Plain text entry for case where you're not selecting but always entering new text
  * Support for adding a new item to selectable list on the fly
  * Support for backend as a function returning the item
