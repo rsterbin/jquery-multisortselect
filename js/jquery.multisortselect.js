@@ -1,44 +1,6 @@
 /**
  * MultiSortSelect plugin
  *
- * Use this plugin for form elements where you want to add several things by
- * autocomplete, sort them with drag and drop, remove them by clicking an x
- * button, and returning them to the form as a comma-separated list of ids.
- *
- * - You must invoke the plugin on a text input.
- * - To default the form, you must fill in a comma-separated list of ids.
- * - You can choose a backend of an ajax url (accepts "term" and returns json
- *   describing the results, and accepts "defaults" and returns the same,
- *   only for those ids).
- * - Or, for short lists, you can choose a backend of hardcoded json describing
- *   all the options.
- * - The json describing the items must include at least "id" (the id), "label"
- *   (what you want to appear in autocomplete options), and "value" (what you
- *   want to appear in the autocomplete field when selected).
- * - You can provide the option "format" (a function that takes an item object
- *   from your json and returns the html for that list item) if you want more to
- *   show than the autocomplete label.
- * - You can set "show_all" to true if you want to have a link that shows a list
- *   of all the available options.  NB: if you're using a url backend, it must
- *   accept the parameter "all" and return all of the items.
- *
- * Example:
- * <code>
- *  <form action="">
- *    <label for="categories">Categories</label>
- *    <input id="categories" name="categories" value="2,14,3" />
- *    ...
- *  </form>
- *  <script>
- *    $(document).ready(function() {
- *      $('#categories').multiSortSelect({
- *        backend: '/categories/search',
- *        format: function (item) { return '<b>' . item.label . '</b>'; }
- *      });
- *    });
- *  </script>
- * </code>
- *
  * @package    MultiSortSelect
  * @copyright  Copyright (c) 2013 Reha Sterbin
  * @version    $Id$
@@ -46,17 +8,25 @@
  * @note       First draft developed for Ora Media, LLC
  */
 
-// {{{ define plugin
+(function ($) {
 
-if (typeof(MultiSortSelect) === "undefined") {
-    // Constructor
-    MultiSortSelect = function(el, opts) {
-        this.init(el, opts);
+    // {{{ define plugin
+
+    // {{{ Constructor
+
+    /**
+     * Initializes a new object
+     *
+     * @param Element $el  the subject element (must be <input type="text">)
+     * @param object  opts any custom options
+     */
+    MultiSortSelect = function($el, opts) {
+        this.init($el, opts);
     }
 
-    // {{{ properties
+    // }}}
+    // {{{ Class-level properties
 
-    // Class-level properties
     MultiSortSelect.registry = new Array(); // Index each new object (for use in css ids)
     MultiSortSelect.default_opts = {
         backend: [],
@@ -66,7 +36,7 @@ if (typeof(MultiSortSelect) === "undefined") {
     };
 
     // }}}
-    // {{{ static methods
+    // {{{ Class-level methods
 
     // {{{ fetch()
 
@@ -197,7 +167,9 @@ if (typeof(MultiSortSelect) === "undefined") {
 
     // Object prototype
     $.extend(MultiSortSelect.prototype, {
-        // object variables
+
+        // {{{ Object variables
+
         id: 0,
         opts: {},
         cache: '',
@@ -211,6 +183,7 @@ if (typeof(MultiSortSelect) === "undefined") {
         $showall: '',
         $newitem: '',
 
+        // }}}
         // {{{ init()
 
         /**
@@ -475,22 +448,23 @@ if (typeof(MultiSortSelect) === "undefined") {
 
     // }}}
 
-}
+    // }}}
+    // {{{ Add to jQuery
 
-// }}}
-// {{{ add to jquery
-
-// Add to Jquery as a plugin
-$.fn.multisortselect = function(opts) {
-    if (typeof(opts) == 'object') {
-        var objs = [];
-        $(this).each(function () {
+    /**
+     * Adds the plugin to jquery
+     *
+     * Filters out any non-text-input elements.
+     *
+     * @param object opts any custom options
+     */
+    $.fn.multisortselect = function(opts) {
+        return this.filter('input[type=text]').each(function () {
             var newobj = new MultiSortSelect($(this), opts);
-            objs.push(newobj);
         });
-        return objs;
-    }
-};
+    };
 
-// }}}
+    // }}}
+
+})(jQuery);
 
