@@ -28,6 +28,7 @@
     // {{{ Class-level properties
 
     MultiSortSelect.registry = new Array(); // Index each new object (for use in css ids)
+    MultiSortSelect.new_id = '_multisortselect_new';
     MultiSortSelect.default_opts = {
         entry_type: 'autocomplete',
         backend: [],
@@ -140,6 +141,10 @@
         if (obj) {
             for (var i = 0; i < ui.content.length; i++) {
                 obj.cacheItem(ui.content[i]);
+            }
+            if (obj.opts.allow_new) {
+                var entry = $(e.target).val();
+                obj.addNewSuggestion(entry, ui);
             }
         }
     };
@@ -275,6 +280,15 @@
             this.allItems = new Array;
             this.featuredItems = new Array;
 
+            // Prep the item list, if we already have one
+            if (typeof(this.opts.backend) == 'object') {
+                this.allItems = this.opts.backend;
+                this.fetchedAll = true;
+                for (var i = 0; i < this.allItems.length; i++) {
+                    this.cacheItem(this.allItems[i]);
+                }
+            }
+
             // Initialize the node
             this.$input.wrap('<div class="multisortselect" id="multisortselect_' + this.id + '" />');
             this.$node = this.$input.closest('.multisortselect');
@@ -344,15 +358,6 @@
             this.$input.addClass('multisortselect-hidden');
             this.$input.hide();
 
-            // Prep the item list, if we already have one
-            if (typeof(this.opts.backend) == 'object') {
-                this.allItems = this.opts.backend;
-                this.fetchedAll = true;
-                for (var i = 0; i < this.allItems.length; i++) {
-                    this.cacheItem(this.allItems[i]);
-                }
-            }
-
             // Load up the list with default items
             var defaults = this.$input.val();
             if (defaults != '') {
@@ -401,6 +406,25 @@
         },
 
         // }}}
+        // {{{ addNewSuggestion()
+
+        /**
+         * Adds a "new" suggetion to the autocomplete list
+         *
+         * @param string entry the typed-in text
+         * @param object ui    contains "content", a list of the responses
+         */
+        addNewSuggestion: function(entry, ui) {
+            if (typeof this.opts.build_suggestion == 'function') {
+                var label = this.opts.build_suggestion(entry, this);
+            } else {
+                var label = 'New: ' + entry;
+            }
+            var suggest = this.buildPlaceholderFromEntry(entry, label);
+            ui.content.unshift(suggest);
+        },
+
+        // }}}
         // {{{ validateEntry()
 
         /**
@@ -430,6 +454,25 @@
                 return this.opts.build(entry);
             }
             return { id: entry, label: entry, value: entry };
+        },
+
+        // }}}
+        // {{{ buildPlaceholderFromEntry()
+
+        /**
+         * Builds a placeholder item from some text entry
+         *
+         * @param  string entry the text entry
+         * @param  string label [optional] the label
+         * @return object an object usable here
+         */
+        buildPlaceholderFromEntry: function(entry, label) {
+            return {
+                id: MultiSortSelect.new_id,
+                label: typeof label != 'undefined' ? label : 'New',
+                multisortselect_is_new_option: true,
+                multisortselect_entry: entry
+            };
         },
 
         // }}}
@@ -474,6 +517,22 @@
         },
 
         // }}}
+        // {{{ hasCachedItem()
+
+        /**
+         * Returns whether we have a cached item
+         *
+         * @param  object item    the item
+         * @return bool   whether the item is cached
+         */
+        hasCachedItem: function(item) {
+            if (typeof(this.cache) == 'string') {
+                return false;
+            }
+            return (typeof this.cache[item.id] != 'undefined');
+        },
+
+        // }}}
         // {{{ cacheItem()
 
         /**
@@ -498,6 +557,20 @@
          * @param bool   update whether to update the value
          */
         insertItem: function(item, update) {
+            if (item.multisortselect_is_new_option) {
+                if (typeof this.opts.build_item == 'function') {
+                    var built = this.opts.build_item(item.multisortselect_entry, this);
+                } else {
+                    var built = this.buildItemFromEntry(item.multisortselect_entry);
+                }
+                // Don't insert it it didn't return an item
+                if (typeof built != 'object' || !built.id) {
+                    return;
+                }
+                item = built;
+                this.broadcastEvent('newItemInsert', { 'item': item });
+            }
+
             var iid = item.id;
             if (this.opts.unique) {
                 var index = this.getCurrentIndex(iid);
@@ -509,6 +582,7 @@
             if (update) {
                 this.$input.attr('value', JSON.stringify(this.currentIds));
             }
+
             var $li = $('<li class="multisortselect-list-item">' +
                     '<div class="multisortselect-item"></div>' +
                     '<a href="#" class="multisortselect-remove" title="Remove">&#xd7;</a>' +
@@ -517,6 +591,11 @@
             $li.find('.multisortselect-item').html('<i class="icon-sort"></i>' + this.opts.format(item));
             $li.find('.multisortselect-remove').click(MultiSortSelect.eventRemoveItem);
             this.$list.append($li);
+
+            if (!this.hasCachedItem(item)) {
+                this.cacheItem(item);
+            }
+
             if (typeof this.opts.after_add == 'function') {
                 this.opts.after_add($li);
             }
@@ -532,7 +611,9 @@
          * @param bool update whether to update the value
          */
         insertItemById: function(iid, update) {
-            if (typeof(this.cache[iid]) == 'object') {
+            if (iid == MultiSortSelect.new_id) {
+                return this.insertItem(this.buildPlaceholderFromEntry(''), update);
+            } else if (typeof(this.cache[iid]) == 'object') {
                 return this.insertItem(this.cache[iid], update);
             } else if (this.opts.entry_type == 'text') {
                 return this.insertItem(this.buildItemFromId(iid), update);
