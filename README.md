@@ -59,8 +59,7 @@ Options
 
 | Option           | Type     | Default                                  | Description                                        |
 |:---------------- |:-------- |:---------------------------------------- |:-------------------------------------------------- |
-| `autocomplete`   | boolean  | `true`                                   | whether to use the autocomplete entry type         |
-| `textentry`      | boolean  | `false`                                  | whether to use the text entry type                 |
+| `entry_type`     | string   | `autocomplete`                           | the entry type: `autocomplete` (default) or `text` |
 | `backend`        | mixed    | _none_                                   | how to get the objects (array or url)              |
 | `format`         | function | `function (item) { return item.label; }` | how to display the element in the list             |
 | `unique`         | boolean  | `true`                                   | whether to allow only one copy of any id           |
