@@ -29,6 +29,8 @@
 
     MultiSortSelect.registry = new Array(); // Index each new object (for use in css ids)
     MultiSortSelect.default_opts = {
+        autocomplete: true,
+        textentry: false,
         backend: [],
         format: function (item) { return item.label; },
         unique: true,
@@ -83,6 +85,29 @@
         var obj = MultiSortSelect.fetch(mid);
         if (obj) {
             obj.insertItem(ui.item, true);
+        }
+        $c.val('');
+        return false;
+    };
+
+    // }}}
+    // {{{ eventTextEnter()
+
+    /**
+     * On-enter event for the entry box
+     *
+     * @param Event e the event
+     */
+    MultiSortSelect.eventTextEnter = function(e) {
+        var $c = $(e.target);
+        var mid = $c.closest('.multisortselect').data('multisortselect_id');
+        var obj = MultiSortSelect.fetch(mid);
+        if (obj) {
+            var val = $c.val();
+            if (obj.validateEntry(val)) {
+                var item = obj.buildItemFromEntry(val);
+                obj.insertItem(item, true);
+            }
         }
         $c.val('');
         return false;
@@ -209,8 +234,8 @@
             this.$input.wrap('<div class="multisortselect" id="multisortselect_' + this.id + '" />');
             this.$node = this.$input.closest('.multisortselect');
             this.$node.data('multisortselect_id', this.id);
-            if (this.opts.topClass) {
-                this.$node.addClass(this.opts.topClass);
+            if (this.opts.top_class) {
+                this.$node.addClass(this.opts.top_class);
             }
 
             // Add the list
@@ -221,15 +246,30 @@
                 stop: MultiSortSelect.eventSortStop
             });
 
-            // Add the autocomplete field, and give it the name and value we want
-            var newitem = '<input type="text" class="multisortselect-autocomplete" />';
-            this.$node.append(newitem);
-            this.$newitem = this.$node.find('.multisortselect-autocomplete');
-            this.$newitem.autocomplete({
-                source: this.opts.backend,
-                response: MultiSortSelect.eventAutocompleteResponse,
-                select: MultiSortSelect.eventAutocompleteSelect
-            });
+            // Add the autocomplete field, if we're doing that
+            if (this.opts.autocomplete) {
+                var newitem = '<input type="text" class="multisortselect-autocomplete" />';
+                this.$node.append(newitem);
+                this.$newitem = this.$node.find('.multisortselect-autocomplete');
+                this.$newitem.autocomplete({
+                    source: this.opts.backend,
+                    response: MultiSortSelect.eventAutocompleteResponse,
+                    select: MultiSortSelect.eventAutocompleteSelect
+                });
+            }
+
+            // Add the text entry field, if we're doing that
+            if (this.opts.textentry) {
+                var newitem = '<input type="text" class="multisortselect-entry" />';
+                this.$node.append(newitem);
+                this.$newitem = this.$node.find('.multisortselect-entry');
+                this.$newitem.keydown(function (e) {
+                    if (e.which == 13) { // Enter
+                        e.preventDefault();
+                        MultiSortSelect.eventTextEnter(e);
+                    }
+                });
+            }
 
             // Add show-all button, if requested
             if (this.opts.show_all) {
@@ -304,6 +344,54 @@
         },
 
         // }}}
+        // {{{ validateEntry()
+
+        /**
+         * Validates an entry
+         *
+         * @param  string entry the text entry
+         * @return bool   whether the text entry is acceptible
+         */
+        validateEntry: function(entry) {
+            if (typeof this.opts.validate == 'function') {
+                return this.opts.validate(entry);
+            }
+            return true;
+        },
+
+        // }}}
+        // {{{ buildItemFromEntry()
+
+        /**
+         * Builds an item from an entry
+         *
+         * @param  string entry the text entry
+         * @return object an object usable here
+         */
+        buildItemFromEntry: function(entry) {
+            if (typeof this.opts.build == 'function') {
+                return this.opts.build(entry);
+            }
+            return { id: entry, label: entry, value: entry };
+        },
+
+        // }}}
+        // {{{ buildItemFromId()
+
+        /**
+         * Builds an item from an id
+         *
+         * @param  mixed  id the id
+         * @return object an object usable here
+         */
+        buildItemFromId: function(id) {
+            if (typeof this.opts.build == 'function') {
+                return this.opts.build(null, id);
+            }
+            return { id: id, label: id, value: id };
+        },
+
+        // }}}
         // {{{ getCurrentIndex()
 
         /**
@@ -372,8 +460,8 @@
             $li.find('.multisortselect-item').html('<i class="icon-sort"></i>' + this.opts.format(item));
             $li.find('.multisortselect-remove').click(MultiSortSelect.eventRemoveItem);
             this.$list.append($li);
-            if (typeof this.opts.afterAdd == 'function') {
-                this.opts.afterAdd($li);
+            if (typeof this.opts.after_add == 'function') {
+                this.opts.after_add($li);
             }
         },
 
@@ -389,6 +477,8 @@
         insertItemById: function(iid, update) {
             if (typeof(this.cache[iid]) == 'object') {
                 return this.insertItem(this.cache[iid], update);
+            } else if (this.opts.textentry) {
+                return this.insertItem(this.buildItemFromId(iid), update);
             } else {
                 var arr = new Array(iid);
                 $.ajax({

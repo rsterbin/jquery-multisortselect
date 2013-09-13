@@ -31,9 +31,15 @@ Important Notes
   autocomplete options), and `value` (what you want to appear in the
   autocomplete field when selected).  You may define any other keys you like.
 
-* You can choose a backend of an ajax url (accepts `term` and returns json
-  describing the results, and accepts `defaults` and returns the same, only for
-  those ids), or you can provide a json array describing all the options.
+* If you want to use an autocomplete entry, you can choose a backend of an ajax
+  url (accepts `term` and returns json describing the results, and accepts
+  `defaults` and returns the same, only for those ids), or you can provide a
+  json array describing all the options.
+
+* If you want to use the plain text entry, you can provide two functions:
+  `validate` and `build`.  The first accepts the value of the text field and
+  returns true or false, and the second accepts two parameters, the text entry
+  and the id, and returns an item object.
 
 * You can provide the option `format` (a function that takes an item object
   from your json and returns the html for that list item).  If you don't
@@ -48,13 +54,17 @@ Options
 
 | Option           | Type     | Default                                  | Description                                        |
 |:---------------- |:-------- |:---------------------------------------- |:-------------------------------------------------- |
+| `autocomplete`   | boolean  | `true`                                   | whether to use the autocomplete entry type         |
+| `textentry`      | boolean  | `false`                                  | whether to use the text entry type                 |
 | `backend`        | mixed    | _none_                                   | how to get the objects (array or url)              |
 | `format`         | function | `function (item) { return item.label; }` | how to display the element in the list             |
 | `unique`         | boolean  | `true`                                   | whether to allow only one copy of any id           |
 | `match`          | function | _none_                                   | use this to determine whether two ids are the same |
-| `topClass`       | string   | _none_                                   | set this class on the wrapper div                  |
+| `top_class`      | string   | _none_                                   | set this class on the wrapper div                  |
+| `validate`       | function | _none_                                   | when adding a text entry, check this first         |
+| `build`          | function | _none_                                   | use this to turn a text entry into an object       |
 | `show_all`       | boolean  | `false`                                  | whether to provide a "Show All" button             |
-| `afterAdd`       | function | _none_                                   | do this after each item is added                   |
+| `after_add`      | function | _none_                                   | do this after each item is added                   |
 
 Minimum Example
 ---------------
@@ -62,7 +72,7 @@ Minimum Example
 Assumes you've already included jquery, jquery ui, and the plugin css and js.
 
 ```html
- <input type="text" id="categories" name="categories" value="2,14,3" />
+ <input type="text" id="categories" name="categories" value="[2,14,3]" />
  <script>
    $(document).ready(function() {
      $('#categories').multisortselect({ backend: '/categories.php' });
@@ -79,9 +89,10 @@ Requirements
 TODO
 -----
 
- * Plain text entry for case where you're not selecting but always entering new text
  * Support for adding a new item to selectable list on the fly
  * Support for backend as a function returning the item
  * Ability to define backend types per call type (e.g., one url for search and one for new item)
  * Featured button like Show All
+ * Pluggable entry types (select, autocomplete, text, user-defined) in their own classes
+ * Pluggable backend types (url, json array, function) in their own classes
 

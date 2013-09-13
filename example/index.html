@@ -385,16 +385,29 @@
     <h1>jquery.multisortselect.js</h1>
     <p>Add, remove, and sort items.</p>
 
-    <h2>JQuery UI Theme Example</h2>
+    <h2>Basic Example</h2>
 
     <div id="my-ui-example" class="example">
-        <p class="help">Start typing to select a language.  Drag to reorder, and click the x to remove a language.</p>
-        <input type="text" id="my-ui-elem" name="languages" value="" />
+        <p class="help">Start typing to select a programming language.  Drag to reorder, and click the x to remove a language.</p>
+        <input type="text" id="my-ui-elem" name="languages" value="[290,77,506]" />
     </div>
 
     <script>
         $(function($) {
             $('#my-ui-elem').multisortselect({ backend: langs });
+        }( jQuery ));
+    </script>
+
+    <h2>Text entry Example</h2>
+
+    <div id="my-text-example" class="example">
+        <p class="help">Type any human language and hit enter.  Drag to reorder, and click the x to remove a language.</p>
+        <input type="text" id="my-text-elem" name="languages" value='["English","French","German","Korean"]' />
+    </div>
+
+    <script>
+        $(function($) {
+            $('#my-text-elem').multisortselect({ autocomplete: false, textentry: true });
         }( jQuery ));
     </script>
 
