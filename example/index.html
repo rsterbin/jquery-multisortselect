@@ -411,6 +411,33 @@
         }( jQuery ));
     </script>
 
+    <h2>Featured Example</h2>
+
+    <div id="my-featured-example" class="example">
+        <p class="help">Start typing to select a programming language.  Drag to reorder, and click the x to remove a language.</p>
+        <input type="text" id="my-featured-elem" name="languages" value="" />
+    </div>
+
+    <script>
+        $(function($) {
+            $('#my-featured-elem').multisortselect({ backend: langs, featured: function (mss) {
+                var featured = new Array;
+                for (var i = 0; i < langs.length; i++) {
+                    if (langs[i].label.match(/javascript/i)
+                        || langs[i].label.match(/perl/i)
+                        || langs[i].label.match(/php/i)
+                        || langs[i].label.match(/shell/i)
+                        || langs[i].label.match(/basic/i)
+                        || langs[i].label.match(/java/i)
+                    ) {
+                        featured.push(langs[i]);
+                    }
+                }
+                return featured;
+            } });
+        }( jQuery ));
+    </script>
+
 </body>
 </html>
 

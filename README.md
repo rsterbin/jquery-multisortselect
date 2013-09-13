@@ -49,6 +49,11 @@ Important Notes
   of all the available options.  NB: if you're using a url backend, it must
   accept the parameter `all` and return all of the items.
 
+* You can set `featured` if you want to have a link that shows a list of
+  specially-selected options, similar to the show-all link.  This should be a
+  function that returns the list of items you want.  Set `cache_featured` to
+  false if you want to call it on every button press.
+
 Options
 -------
 
@@ -64,6 +69,8 @@ Options
 | `validate`       | function | _none_                                   | when adding a text entry, check this first         |
 | `build`          | function | _none_                                   | use this to turn a text entry into an object       |
 | `show_all`       | boolean  | `false`                                  | whether to provide a "Show All" button             |
+| `featured`       | function | _none_                                   | how to find the featured items                     |
+| `cache_featured` | boolean  | `true`                                   | whether to cache the list of featured items        |
 | `after_add`      | function | _none_                                   | do this after each item is added                   |
 
 Minimum Example
@@ -92,7 +99,6 @@ TODO
  * Support for adding a new item to selectable list on the fly
  * Support for backend as a function returning the item
  * Ability to define backend types per call type (e.g., one url for search and one for new item)
- * Featured button like Show All
  * Pluggable entry types (select, autocomplete, text, user-defined) in their own classes
  * Pluggable backend types (url, json array, function) in their own classes
 

@@ -34,7 +34,8 @@
         backend: [],
         format: function (item) { return item.label; },
         unique: true,
-        show_all: false
+        show_all: false,
+        cache_featured: true
     };
 
     // }}}
@@ -186,6 +187,41 @@
     };
 
     // }}}
+    // {{{ eventShowFeatured()
+
+    /**
+     * Click event that toggles the featured box
+     *
+     * @param Event e the event
+     */
+    MultiSortSelect.eventShowFeatured = function(e) {
+        e.preventDefault();
+        var mid = $(this).closest('.multisortselect').data('multisortselect_id');
+        var obj = MultiSortSelect.fetch(mid);
+        if (obj) {
+            obj.showFeatured();
+        }
+    };
+
+    // }}}
+    // {{{ eventShowFeaturedAdd()
+
+    /**
+     * Click event that adds an item from the featured box
+     *
+     * @param Event e the event
+     */
+    MultiSortSelect.eventShowFeaturedAdd = function(e) {
+        e.preventDefault();
+        var mid = $(this).closest('.multisortselect').data('multisortselect_id');
+        var obj = MultiSortSelect.fetch(mid);
+        if (obj) {
+            var iid = $(this).closest('li').attr('rel');
+            obj.insertItemById(iid, true);
+        }
+    };
+
+    // }}}
 
     // }}}
     // {{{ Prototype
@@ -201,6 +237,9 @@
         allItems: '',
         fetchedAll: false,
         builtShowAll: false,
+        featuredItems: '',
+        fetchedFeatured: false,
+        builtFeatured: false,
         $input: '',
         $node: '',
         $list: '',
@@ -229,6 +268,7 @@
             // Initialize tracking properties
             this.currentIds = new Array;
             this.allItems = new Array;
+            this.featuredItems = new Array;
 
             // Initialize the node
             this.$input.wrap('<div class="multisortselect" id="multisortselect_' + this.id + '" />');
@@ -281,6 +321,18 @@
                 this.$node.append(showall);
                 this.$showall = this.$node.find('.multisortselect-showall');
                 this.$showall.hide();
+            }
+
+            // Add featured button, if requested
+            if (typeof this.opts.featured == 'function') {
+                var button = '<a href="#" class="btn multisortselect-featured_button">Featured</a>';
+                this.$node.append(button);
+                this.$featured_button = this.$node.find('.multisortselect-featured_button');
+                this.$featured_button.click(MultiSortSelect.eventShowFeatured);
+                var flist = '<ul class="multisortselect-featured"></ul>';
+                this.$node.append(flist);
+                this.$featured = this.$node.find('.multisortselect-featured');
+                this.$featured.hide();
             }
 
             // Hide the input field
@@ -572,6 +624,33 @@
             }
             if (this.builtShowAll) {
                 this.$showall.toggle();
+            }
+        },
+
+        // }}}
+        // {{{ showFeatured()
+
+        /**
+         * Shows the featured options
+         */
+        showFeatured: function() {
+            if (typeof this.opts.featured == 'function' && (!this.opts.cache_featured || !this.fetchedFeatured)) {
+                this.featuredItems = this.opts.featured(this);
+                this.fetchedFeatured = true;
+            }
+            if (this.fetchedFeatured && (!this.opts.cache_featured || !this.builtFeatured)) {
+                for (var i = 0; i < this.featuredItems.length; i++) {
+                    var item = this.featuredItems[i];
+                    var $li = $('<li></li>');
+                    $li.attr('rel', item.id);
+                    $li.html('<i class="icon-plus"></i>' + this.opts.format(item));
+                    $li.click(MultiSortSelect.eventShowFeaturedAdd);
+                    this.$featured.append($li);
+                }
+                this.builtFeatured = true;
+            }
+            if (this.builtFeatured) {
+                this.$featured.toggle();
             }
         }
 
