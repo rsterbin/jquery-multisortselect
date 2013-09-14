@@ -26,16 +26,28 @@ Important Notes
   is on) are performed using jQuery.inArray().
 
 * Items in the list are represented by objects.  These objects have one
-  required key: `id`, as described above.  If you're using autocomplete, your
-  items must also include the keys `label` (what you want to appear in
-  autocomplete options), and `value` (what you want to appear in the
-  autocomplete field when selected).  You may define any other keys you like,
-  but keys that start with `multisortselect_` are reserved.
+  required key: `id`, as described above.  If you're using autocomplete or
+  select, your items must also include the key `label` (what you want to appear
+  in options), and if you're using autocomplete, you'll need `value` as well
+  (what you want to appear in the autocomplete field when selected).  You may
+  define any other keys you like, but keys that start with `multisortselect_`
+  are reserved.
+
+* There are three entry types: select, autocomplete, and text.  Select and
+  autocomplete require that you provide the `backend`, which provides a way of
+  retrieving items.  It can be a url which accepts the get variables `term`
+  (autocomplete), `all` (select), and `defaults` (both), or a json array
+  describing all the options.
 
 * If you want to use an autocomplete entry, you can choose a backend of an ajax
   url (accepts `term` and returns json describing the results, and accepts
   `defaults` and returns the same, only for those ids), or you can provide a
   json array describing all the options.
+
+* If you want to use a select entry, you can choose a backend of an ajax url
+  (accepts `all` and returns json for all the objects, and accepts `defaults`
+  and returns the same, only for those ids), or you can provide a json array
+  describing all the options.
 
 * If you want to use the plain text entry, you can provide two functions:
   `validate` and `build`.  The first accepts the value of the text field and
@@ -69,22 +81,22 @@ Important Notes
 Options
 -------
 
-| Option             | Type     | Default                                  | Description                                        |
-|:------------------ |:-------- |:---------------------------------------- |:-------------------------------------------------- |
-| `entry_type`       | string   | `autocomplete`                           | the entry type: `autocomplete` (default) or `text` |
-| `backend`          | mixed    | _none_                                   | how to get the objects (array or url)              |
-| `format`           | function | `function (item) { return item.label; }` | how to display the element in the list             |
-| `unique`           | boolean  | `true`                                   | whether to allow only one copy of any id           |
-| `match`            | function | _none_                                   | use this to determine whether two ids are the same |
-| `top_class`        | string   | _none_                                   | set this class on the wrapper div                  |
-| `validate`         | function | _none_                                   | when adding a text entry, check this first         |
-| `build`            | function | _none_                                   | use this to turn a text entry into an object       |
-| `allow_new`        | boolean  | `false`                                  | whether to allow a new item to be added            |
-| `build_suggestion` | function | _none_                                   | returns the label for the autcomplete option       |
-| `show_all`         | boolean  | `false`                                  | whether to provide a "Show All" button             |
-| `featured`         | function | _none_                                   | how to find the featured items                     |
-| `cache_featured`   | boolean  | `true`                                   | whether to cache the list of featured items        |
-| `after_add`        | function | _none_                                   | do this after each item is added                   |
+| Option             | Type     | Default                                  | Description                                                  |
+|:------------------ |:-------- |:---------------------------------------- |:------------------------------------------------------------ |
+| `entry_type`       | string   | `autocomplete`                           | the entry type: `autocomplete` (default), `select` or `text` |
+| `backend`          | mixed    | _none_                                   | how to get the objects (array or url)                        |
+| `format`           | function | `function (item) { return item.label; }` | how to display the element in the list                       |
+| `unique`           | boolean  | `true`                                   | whether to allow only one copy of any id                     |
+| `match`            | function | _none_                                   | use this to determine whether two ids are the same           |
+| `top_class`        | string   | _none_                                   | set this class on the wrapper div                            |
+| `validate`         | function | _none_                                   | when adding a text entry, check this first                   |
+| `build`            | function | _none_                                   | use this to turn a text entry into an object                 |
+| `allow_new`        | boolean  | `false`                                  | whether to allow a new item to be added                      |
+| `build_suggestion` | function | _none_                                   | returns the label for the autcomplete option                 |
+| `show_all`         | boolean  | `false`                                  | whether to provide a "Show All" button                       |
+| `featured`         | function | _none_                                   | how to find the featured items                               |
+| `cache_featured`   | boolean  | `true`                                   | whether to cache the list of featured items                  |
+| `after_add`        | function | _none_                                   | do this after each item is added                             |
 
 Minimum Example
 ---------------

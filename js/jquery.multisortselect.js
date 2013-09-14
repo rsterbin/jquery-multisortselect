@@ -86,70 +86,6 @@
     };
 
     // }}}
-    // {{{ eventAutocompleteSelect()
-
-    /**
-     * On-select event for the autocomplete
-     *
-     * @param Event  e  the event
-     * @param object ui the info, including the item selected
-     */
-    MultiSortSelect.eventAutocompleteSelect = function(e, ui) {
-        var $c = $(this);
-        var obj = MultiSortSelect.objectFromElem($(this));
-        if (obj) {
-            obj.insertItem(ui.item, true);
-        }
-        $c.val('');
-        return false;
-    };
-
-    // }}}
-    // {{{ eventTextEnter()
-
-    /**
-     * On-enter event for the entry box
-     *
-     * @param Event e the event
-     */
-    MultiSortSelect.eventTextEnter = function(e) {
-        var $c = $(e.target);
-        var obj = MultiSortSelect.objectFromElem($(this));
-        if (obj) {
-            var val = $c.val();
-            if (obj.validateEntry(val)) {
-                var item = obj.buildItemFromEntry(val);
-                obj.insertItem(item, true);
-            }
-        }
-        $c.val('');
-        return false;
-    };
-
-    // }}}
-    // {{{ eventAutocompleteResponse()
-
-    /**
-     * On-response event for the autocomplete
-     *
-     * @param Event  e  the event
-     * @param object ui the info, including the item selected
-     */
-    MultiSortSelect.eventAutocompleteResponse = function(e, ui) {
-        var $c = $(this);
-        var obj = MultiSortSelect.objectFromElem($(this));
-        if (obj) {
-            for (var i = 0; i < ui.content.length; i++) {
-                obj.cacheItem(ui.content[i]);
-            }
-            if (obj.opts.allow_new) {
-                var entry = $(e.target).val();
-                obj.addNewSuggestion(entry, ui);
-            }
-        }
-    };
-
-    // }}}
     // {{{ eventSortStop()
 
     /**
@@ -232,6 +168,20 @@
     };
 
     // }}}
+    // {{{ debug()
+
+    /**
+     * Wrapper for console.log
+     *
+     * @param mixed obj the thing to dump
+     */
+    MultiSortSelect.debug = function(obj) {
+        if (typeof console != 'undefined' && typeof console.log == 'function') {
+            console.log(obj);
+        }
+    };
+
+    // }}}
 
     // }}}
     // {{{ Prototype
@@ -241,6 +191,7 @@
         // {{{ Object variables
 
         id: 0,
+        eventRegistry: '',
         opts: {},
         cache: '',
         currentIds: '',
@@ -255,7 +206,7 @@
         $list: '',
         $showall_button: '',
         $showall: '',
-        $newitem: '',
+        $entry: '',
 
         // }}}
         // {{{ init()
@@ -274,6 +225,9 @@
             this.$input = $el;
             this.$input.data('multisortselect_id', this.id);
             this.opts = $.extend({}, MultiSortSelect.default_opts, opts);
+            this.eventRegistry = {
+                newItemInsert: []
+            };
 
             // Initialize tracking properties
             this.currentIds = new Array;
@@ -305,30 +259,27 @@
                 stop: MultiSortSelect.eventSortStop
             });
 
-            // Add the autocomplete field, if we're doing that
+            // Add the entry field
+            this.$node.append('<div class="multisortselect-entry"></div>');
             if (this.opts.entry_type == 'autocomplete') {
-                var newitem = '<input type="text" class="multisortselect-autocomplete" />';
-                this.$node.append(newitem);
-                this.$newitem = this.$node.find('.multisortselect-autocomplete');
-                this.$newitem.autocomplete({
-                    source: this.opts.backend,
-                    response: MultiSortSelect.eventAutocompleteResponse,
-                    select: MultiSortSelect.eventAutocompleteSelect
-                });
+                var entry_opts = $.extend({}, this.opts.entry);
+                if (typeof entry_opts.source == 'undefined') {
+                    entry_opts.source = this.opts.backend;
+                }
+                this.entryObj = new MSS_Entry_Autocomplete(this, entry_opts);
+            } else if (this.opts.entry_type == 'text') {
+                this.entryObj = new MSS_Entry_Text(this, this.opts.entry);
+            } else if (this.opts.entry_type == 'select') {
+                this.entryObj = new MSS_Entry_Select(this, this.opts.entry);
+            } else {
+                var customClass = this.findFunctionFromString(this.opts.entry_type);
+                if (typeof customClass != 'function') {
+                    throw 'Entry type "' + this.opts.entry_type + '" is not supported';
+                }
+                this.entryObj = new customClass(this, this.opts.entry);
             }
-
-            // Add the text entry field, if we're doing that
-            if (this.opts.entry_type == 'text') {
-                var newitem = '<input type="text" class="multisortselect-entry" />';
-                this.$node.append(newitem);
-                this.$newitem = this.$node.find('.multisortselect-entry');
-                this.$newitem.keydown(function (e) {
-                    if (e.which == 13) { // Enter
-                        e.preventDefault();
-                        MultiSortSelect.eventTextEnter(e);
-                    }
-                });
-            }
+            this.$entry = this.$node.find('.multisortselect-entry');
+            this.$entry.append(this.entryObj.build());
 
             // Add show-all button, if requested
             if (this.opts.show_all) {
@@ -380,13 +331,14 @@
                     'url': this.opts.backend,
                     'data': { 'defaults': defaults },
                     'dataType': 'json',
-                    'context': this,
+                    'context': { self: this, call: 'loadDefaults' },
                     'success': function (data) {
                         for (var i = 0; i < data.length; i++) {
-                            this.cacheItem(data[i]);
-                            this.insertItem(data[i], false);
+                            this.self.cacheItem(data[i]);
+                            this.self.insertItem(data[i], false);
                         }
-                    }
+                    },
+                    'error': this.handleAjaxError
                 });
             } else {
                 var item_ids = new Array;
@@ -396,32 +348,178 @@
                     console.log(ex);
                 }
                 for (var i = 0; i < item_ids.length; i++) {
+                    var item = null;
                     if (typeof(this.cache[item_ids[i]]) == 'object') {
-                        this.insertItem(this.cache[item_ids[i]], false);
+                        item = this.cache[item_ids[i]];
                     } else {
-                        this.insertItemById(item_ids[i], false);
+                        item = this.buildItemFromId(item_ids[i]);
                     }
+                    this.insertItem(item, false);
                 }
             }
         },
 
         // }}}
-        // {{{ addNewSuggestion()
+        // {{{ registerEvent()
 
         /**
-         * Adds a "new" suggetion to the autocomplete list
+         * Registers a function for an event
          *
-         * @param string entry the typed-in text
-         * @param object ui    contains "content", a list of the responses
+         * @param string   name the event name
+         * @param function observer   the observer function
          */
-        addNewSuggestion: function(entry, ui) {
-            if (typeof this.opts.build_suggestion == 'function') {
-                var label = this.opts.build_suggestion(entry, this);
-            } else {
-                var label = 'New: ' + entry;
+        registerEvent: function(name, observer) {
+            if (typeof this.eventRegistry[name] != 'undefined') {
+                this.eventRegistry[name].push(observer);
             }
-            var suggest = this.buildPlaceholderFromEntry(entry, label);
-            ui.content.unshift(suggest);
+        },
+
+        // }}}
+        // {{{ broadcastEvent()
+
+        /**
+         * Broadcasts an event to all registered functions
+         *
+         * @param string name   the event name
+         * @param object params info to pass to the registered function
+         */
+        broadcastEvent: function(name, params) {
+            if (typeof this.eventRegistry[name] != 'undefined') {
+                for (var i = 0; i < this.eventRegistry[name].length; i++) {
+                    var fn = this.eventRegistry[name][i];
+                    fn(params, this);
+                }
+            }
+        },
+
+        // }}}
+        // {{{ callForAllItems()
+
+        /**
+         * Calls out for a list of all items
+         *
+         * @param  function  handler a function that handles the list of all items
+         *                           (args: item array, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForAllItems: function(handler, pass) {
+            if (typeof handler != 'function') {
+                throw 'Handler must be a function';
+            } else if (typeof this.allItems != 'string') {
+                handler(this.allItems, pass);
+                return;
+            } else if (typeof(this.opts.backend) == 'string') {
+                $.ajax({
+                    'type': 'GET',
+                    'url': this.opts.backend,
+                    'data': { 'all': true },
+                    'dataType': 'json',
+                    'context': { self: this, call: 'callForAllItems', pass: pass, handler: handler },
+                    'success': function (data) {
+                        this.self.allItems = new Array();
+                        for (var i = 0; i < data.length; i++) {
+                            this.self.cacheItem(data[i]);
+                            this.self.allItems.push(data[i]);
+                        }
+                        this.self.fetchedAll = true;
+                        this.handler(this.self.allItems, this.pass);
+                    },
+                    'error': this.handleAjaxError
+                });
+            } else {
+                this.debug('Cannot retrieve all items');
+            }
+        },
+
+        // }}}
+        // {{{ callForItemById()
+
+        /**
+         * Calls out for an item by its id
+         *
+         * @param  mixed     iid     the item id
+         * @param  function  handler a function that handles the item (args:
+         *                           item, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForItemById: function(iid, handler, pass) {
+            if (typeof handler != 'function') {
+                throw 'Handler must be a function';
+            }
+
+            if (iid == MultiSortSelect.new_id) {
+                this.callForNewItem('', handler, pass);
+                return;
+            }
+
+            if (typeof this.cache[iid] != 'undefined') {
+                handler(this.cache[iid], pass);
+                return;
+            }
+
+            if (typeof(this.opts.backend) == 'string') {
+                var arr = new Array(iid);
+                $.ajax({
+                    'type': 'GET',
+                    'url': this.opts.backend,
+                    'data': { 'defaults': JSON.stringify(arr) },
+                    'dataType': 'json',
+                    'context': { self: this, call: 'callForItemById', pass: pass, handler: handler },
+                    'success': function (data) {
+                        for (var i = 0; i < data.length; i++) {
+                            this.self.cacheItem(data[i]);
+                            this.handler(data[i], this.pass);
+                        }
+                    },
+                    'error': this.handleAjaxError
+                });
+                return;
+            }
+
+            this.debug('Cannot retrieve item by id');
+        },
+
+        // }}}
+        // {{{ callForNewItem()
+
+        /**
+         * Calls out for a new item, possibly given some text
+         *
+         * @param  string    entry   something from which to build the item
+         * @param  function  handler a function that handles the item (args:
+         *                           item, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForNewItem: function(entry, handler, pass) {
+            if (typeof handler != 'function') {
+                throw 'Handler must be a function';
+            }
+
+            if (typeof(this.opts.backend) == 'string') {
+                $.ajax({
+                    'type': 'POST',
+                    'url': this.opts.backend,
+                    'data': { 'new': entry },
+                    'dataType': 'json',
+                    'context': { self: this, call: 'callForNewItem', pass: pass, handler: handler },
+                    'success': function (data) {
+                        this.self.cacheItem(data);
+                        this.self.broadcastEvent('newItemInsert', { 'item': item });
+                        this.handler(data, this.pass);
+                    },
+                    'error': this.handleAjaxError
+                });
+                return;
+            }
+
+            var item = this.buildPlaceholderFromEntry(entry);
+            handler(item, pass);
         },
 
         // }}}
@@ -615,8 +713,6 @@
                 return this.insertItem(this.buildPlaceholderFromEntry(''), update);
             } else if (typeof(this.cache[iid]) == 'object') {
                 return this.insertItem(this.cache[iid], update);
-            } else if (this.opts.entry_type == 'text') {
-                return this.insertItem(this.buildItemFromId(iid), update);
             } else {
                 var arr = new Array(iid);
                 $.ajax({
@@ -624,13 +720,14 @@
                     'url': this.opts.backend,
                     'data': { 'defaults': JSON.stringify(arr) },
                     'dataType': 'json',
-                    'context': { obj: this, update: update },
+                    'context': { self: this, call: 'insertItemById', update: update },
                     'success': function (data) {
                         for (var i = 0; i < data.length; i++) {
-                            this.obj.cacheItem(data[i]);
-                            this.obj.insertItem(data[i], this.update);
+                            this.self.cacheItem(data[i]);
+                            this.self.insertItem(data[i], this.update);
                         }
-                    }
+                    },
+                    'error': this.handleAjaxError
                 });
             }
         },
@@ -685,16 +782,17 @@
                     'url': this.opts.backend,
                     'data': { 'all': true },
                     'dataType': 'json',
-                    'context': this,
+                    'context': { self: this, call: 'showAll' },
                     'success': function (data) {
-                        this.allItems = new Array();
+                        this.self.allItems = new Array();
                         for (var i = 0; i < data.length; i++) {
-                            this.cacheItem(data[i]);
-                            this.allItems.push(data[i]);
+                            this.self.cacheItem(data[i]);
+                            this.self.allItems.push(data[i]);
                         }
-                        this.fetchedAll = true;
-                        this.showAll();
-                    }
+                        this.self.fetchedAll = true;
+                        this.self.showAll();
+                    },
+                    'error': this.handleAjaxError
                 });
             }
             if (this.fetchedAll && !this.builtShowAll) {
@@ -738,6 +836,426 @@
             if (this.builtFeatured) {
                 this.$featured.toggle();
             }
+        },
+
+        // }}}
+        // {{{ findFunctionFromString()
+
+        /**
+         * Given a string, return the function/class by that name
+         *
+         * @param string name the function name
+         * @return function the function, or null if not found
+         */
+        findFunctionFromString: function(name) {
+            if (name == '') {
+                return null;
+            }
+            var parts = name.split('.');
+            var fn = window;
+            for (var i = 0, len = parts.length; i < len; i++) {
+                fn = fn[parts[i]];
+            }
+            if (typeof fn !== 'function') {
+                return null;
+            }
+            return fn;
+        },
+
+        // }}}
+        // {{{ handleAjaxError()
+
+        /**
+         * Handles error responses from the json in a generic way
+         *
+         * @param jqXHR  xhr    the request object
+         * @param string status the status ("timeout", "error", "abort", "parsererror", or null)
+         * @param string error  the text part of the http status
+         */
+        handleAjaxError: function(xhr, status, error) {
+            MultiSortSelect.debug(this);
+            MultiSortSelect.debug(xhr);
+            MultiSortSelect.debug('Status: ' + status + '; Error: ' + error);
+        },
+
+        // }}}
+        // {{{ debug()
+
+        /**
+         * Wrapper for class-level debug
+         *
+         * @param mixed obj the thing to dump
+         */
+        debug: function(obj) {
+            MultiSortSelect.debug(obj);
+        }
+
+        // }}}
+
+    });
+
+    // }}}
+
+    // }}}
+    // {{{ MSS_Entry_Autocomplete class
+
+    // {{{ Constructor
+
+    /**
+     * Initializes a new object
+     *
+     * @param MultiSortSelect mss  the associated MultiSortSelect object
+     * @param object          opts any custom options
+     */
+    MSS_Entry_Autocomplete = function($el, opts) {
+        this.init($el, opts);
+    }
+
+    // }}}
+    // {{{ Class-level properties
+
+    MSS_Entry_Autocomplete.default_opts = {};
+
+    // }}}
+    // {{{ Class-level methods
+
+    // {{{ eventAutocompleteSelect()
+
+    /**
+     * On-select event for the autocomplete
+     *
+     * @param Event  e  the event
+     * @param object ui the info, including the item selected
+     */
+    MSS_Entry_Autocomplete.eventAutocompleteSelect = function(e, ui) {
+        var $c = $(this);
+        var mss = MultiSortSelect.objectFromElem($c);
+        if (mss) {
+            mss.insertItem(ui.item, true);
+        }
+        $c.val('');
+        return false;
+    };
+
+    // }}}
+    // {{{ eventAutocompleteResponse()
+
+    /**
+     * On-response event for the autocomplete
+     *
+     * @param Event  e  the event
+     * @param object ui contains "content", a list of the responses
+     */
+    MSS_Entry_Autocomplete.eventAutocompleteResponse = function(e, ui) {
+        var $c = $(this);
+        var mss = MultiSortSelect.objectFromElem($c);
+        if (mss) {
+            for (var i = 0; i < ui.content.length; i++) {
+                mss.cacheItem(ui.content[i]);
+            }
+            if (mss.opts.allow_new) {
+                var entry = $(e.target).val();
+                mss.entryObj.addNewSuggestion(entry, ui);
+            }
+        }
+    };
+
+    // }}}
+
+    // }}}
+    // {{{ Prototype
+
+    $.extend(MSS_Entry_Autocomplete.prototype, {
+
+        // {{{ Object variables
+
+        mss: null,
+        opts: {},
+
+        // }}}
+        // {{{ init()
+
+        /**
+         * Init method, run only once, on launch
+         *
+         * @param MultiSortSelect mss  the associated MultiSortSelect object
+         * @param object          opts any custom options
+         */
+        init: function(mss, opts) {
+            this.mss = mss;
+            this.opts = $.extend({}, MSS_Entry_Autocomplete.default_opts, opts);
+            if (typeof this.opts.source == 'undefined') {
+                throw 'Option "source" is required for autocomplete';
+            }
+        },
+
+        // }}}
+        // {{{ build()
+
+        /**
+         * Builds the entry
+         *
+         * All necessary events should be attached
+         *
+         * @return Element the entry
+         */
+        build: function() {
+            var $entry = $('<input type="text" class="multisortselect-autocomplete" />');
+            var ac_opts = $.extend({}, this.opts, {
+                response: MSS_Entry_Autocomplete.eventAutocompleteResponse,
+                select: MSS_Entry_Autocomplete.eventAutocompleteSelect
+            });
+            $entry.autocomplete(ac_opts);
+            return $entry;
+        },
+
+        // }}}
+        // {{{ addNewSuggestion()
+
+        /**
+         * Adds a "new" suggetion to the autocomplete list
+         *
+         * @param string entry the typed-in text
+         * @param object ui    contains "content", a list of the responses
+         */
+        addNewSuggestion: function(entry, ui) {
+            if (typeof this.opts.build_suggestion == 'function') {
+                var label = this.opts.build_suggestion(entry, this);
+            } else {
+                var label = 'New: ' + entry;
+            }
+            var suggest = this.mss.buildPlaceholderFromEntry(entry, label);
+            ui.content.unshift(suggest);
+        }
+
+        // }}}
+
+    });
+
+    // }}}
+
+    // }}}
+    // {{{ MSS_Entry_Select class
+
+    // {{{ Constructor
+
+    /**
+     * Initializes a new object
+     *
+     * @param MultiSortSelect mss  the associated MultiSortSelect object
+     * @param object          opts any custom options
+     */
+    MSS_Entry_Select = function($el, opts) {
+        this.init($el, opts);
+    }
+
+    // }}}
+    // {{{ Class-level properties
+
+    MSS_Entry_Select.default_opts = {
+        new_label: 'New'
+    };
+
+    // }}}
+    // {{{ Class-level methods
+
+    // {{{ eventAddButtonClick()
+
+    /**
+     * On-click event for the select's add button
+     *
+     * @param Event e the event
+     */
+    MSS_Entry_Select.eventAddButtonClick = function(e) {
+        e.preventDefault();
+        var mss = MultiSortSelect.objectFromElem($(this));
+        if (mss) {
+            var $s = mss.$entry.find('select');
+            mss.callForItemById($s.val(), function (item, pass) {
+                pass.mss.insertItem(item, true);
+            }, { mss: mss, update: true });
+            $s.val('');
+        }
+    };
+
+    // }}}
+    // {{{ eventNewItemInsert()
+
+    /**
+     * Called when a new item is inserted
+     *
+     * @param object          params the params passed to the observer
+     * @param MultiSortSelect mss    the multisortselect object
+     */
+    MSS_Entry_Select.eventNewItemInsert = function(params, mss) {
+        mss.entryObj.addSelectOption(params.item, mss.$entry.find('select'));
+    };
+
+    // }}}
+
+    // }}}
+    // {{{ Prototype
+
+    $.extend(MSS_Entry_Select.prototype, {
+
+        // {{{ Object variables
+
+        mss: null,
+        opts: {},
+
+        // }}}
+        // {{{ init()
+
+        /**
+         * Init method, run only once, on launch
+         *
+         * @param MultiSortSelect mss  the associated MultiSortSelect object
+         * @param object          opts any custom options
+         */
+        init: function(mss, opts) {
+            this.mss = mss;
+            this.opts = $.extend({}, MSS_Entry_Select.default_opts, opts);
+            this.mss.registerEvent('newItemInsert', MSS_Entry_Select.eventNewItemInsert);
+        },
+
+        // }}}
+        // {{{ build()
+
+        /**
+         * Builds the entry
+         *
+         * All necessary events should be attached
+         *
+         * @return Element the entry
+         */
+        build: function() {
+            var $entry = $('<div class="multisortselect-selection">' +
+                '<select class="multisortselect-select"><option value=""></option></select>' +
+                '<a href="#" class="btn multisortselect-select_button">Add</a>' +
+                '</div>');
+            $entry.find('.multisortselect-select_button').click(MSS_Entry_Select.eventAddButtonClick);
+            if (this.mss.opts.allow_new) {
+                this.addSelectOption(this.mss.buildPlaceholderFromEntry('', this.opts.new_label), $entry.find('select'));
+            }
+            this.mss.callForAllItems(function (items, pass) {
+                for (var i = 0; i < items.length; i++) {
+                    pass.entry.addSelectOption(items[i], pass.$select);
+                }
+            }, { entry: this, $select: $entry.find('select') });
+            return $entry;
+        },
+
+        // }}}
+        // {{{ addSelectOption()
+
+        /**
+         * Pushes an item into the select
+         *
+         * @param object  item    the item
+         * @param Element $select the select element
+         */
+        addSelectOption: function(item, $select) {
+            var $opt = $('<option></option>');
+            $opt.attr('value', item.id);
+            $opt.text(item.label);
+            $select.append($opt);
+        }
+
+        // }}}
+
+    });
+
+    // }}}
+
+    // }}}
+    // {{{ MSS_Entry_Text class
+
+    // {{{ Constructor
+
+    /**
+     * Initializes a new object
+     *
+     * @param MultiSortSelect mss  the associated MultiSortSelect object
+     * @param object          opts any custom options
+     */
+    MSS_Entry_Text = function($el, opts) {
+        this.init($el, opts);
+    }
+
+    // }}}
+    // {{{ Class-level properties
+
+    MSS_Entry_Text.default_opts = {
+    };
+
+    // }}}
+    // {{{ Class-level methods
+
+    // {{{ eventTextEnter()
+
+    /**
+     * On-enter event for the entry box
+     *
+     * @param Event e the event
+     */
+    MSS_Entry_Text.eventTextEnter = function(e) {
+        var $c = $(e.target);
+        var mss = MultiSortSelect.objectFromElem($c);
+        if (mss) {
+            var val = $c.val();
+            if (mss.validateEntry(val)) {
+                mss.insertItem(mss.buildItemFromEntry(val), true);
+            }
+        }
+        $c.val('');
+        return false;
+    };
+
+    // }}}
+
+    // }}}
+    // {{{ Prototype
+
+    $.extend(MSS_Entry_Text.prototype, {
+
+        // {{{ Object variables
+
+        mss: null,
+        opts: {},
+
+        // }}}
+        // {{{ init()
+
+        /**
+         * Init method, run only once, on launch
+         *
+         * @param MultiSortSelect mss  the associated MultiSortSelect object
+         * @param object          opts any custom options
+         */
+        init: function(mss, opts) {
+            this.mss = mss;
+            this.opts = $.extend({}, MSS_Entry_Text.default_opts, opts);
+        },
+
+        // }}}
+        // {{{ build()
+
+        /**
+         * Builds the entry
+         *
+         * All necessary events should be attached
+         *
+         * @return Element the entry
+         */
+        build: function() {
+            var $entry = $('<input type="text" class="multisortselect-entry" />');
+            $entry.keydown(function (e) {
+                if (e.which == 13) { // Enter
+                    e.preventDefault();
+                    MSS_Entry_Text.eventTextEnter(e);
+                }
+            });
+            return $entry;
         }
 
         // }}}

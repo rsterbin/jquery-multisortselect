@@ -4,15 +4,17 @@
     <title>jQuery Multi Sort Select Demo</title>
     <link rel="stylesheet" type="text/css" href="example.css" />
     <!--
-    <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.8.9/themes/smoothness/jquery-ui.css" />
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.0/jquery.min.js"></script>
-    <script src="http://code.jquery.com/ui/1.8.9/jquery-ui.js"></script>
-    -->
     <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
+    -->
+    <link rel="stylesheet" type="text/css" href="jquery-ui-1.9.2.custom.min.css" />
     <link rel="stylesheet" type="text/css" href="../css/jquery.multisortselect.css" />
     <link rel="stylesheet" type="text/css" href="example.css" />
+    <!--
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+    -->
+    <script src="jquery-1.8.3.min.js"></script>
+    <script src="jquery-ui-1.9.2.custom.min.js"></script>
     <script src="../js/jquery.multisortselect.js"></script>
     <script src="example.js"></script>
 </head>
@@ -33,11 +35,24 @@
         }( jQuery ));
     </script>
 
-    <h2>New Item Example</h2>
+    <h2>Text entry Example</h2>
 
-    <div id="my-new-example" class="example">
-        <p class="help">Start typing to select an ice cream flavor.  Drag to reorder, and click the x to remove one.  Choose "New: ..." to add a new flavor.</p>
-        <input type="text" id="my-new-elem" name="flavors" value="[13,3]" />
+    <div id="my-text-example" class="example">
+        <p class="help">Type any human language and hit enter.  Drag to reorder, and click the x to remove a language.</p>
+        <input type="text" id="my-text-elem" name="languages" value='["French","Korean"]' />
+    </div>
+
+    <script>
+        $(function($) {
+            $('#my-text-elem').multisortselect({ entry_type: 'text' });
+        }( jQuery ));
+    </script>
+
+    <h2>Select Example, with new option</h2>
+
+    <div id="my-select-example" class="example">
+        <p class="help">Select an ice cream flavor (or choose "New" to create a new one), and click "Add" to add it to the list.  Drag to reorder, and click the x to remove a flavor.</p>
+        <input type="text" id="my-select-elem" name="languages" value="" />
     </div>
 
     <div id="my-new-flavor">
@@ -47,10 +62,10 @@
 
     <script>
         $(function($) {
-            $('#my-new-elem').multisortselect({
+            $('#my-select-elem').multisortselect({
+                entry_type: 'select',
                 backend: br_31_flavors,
                 allow_new: true,
-                build_suggestion: function (entry) { return 'New Flavor: ' + entry; },
                 build_item: function (entry, obj) {
                     $('#my-new-flavor').data('mss_obj', obj);
                     $('#my-new-flavor').find('input').val(entry);
@@ -58,37 +73,25 @@
                 }
             });
 
-        $('#my-new-flavor').dialog({
-            title: 'Add Flavor',
-            width: 300,
-            height: 250,
-            autoOpen: false,
-            buttons: [ {
-                text: 'Save',
-                click: function (e) {
-                    var $d = $(this);
-                    var mss = $d.data('mss_obj');
-                    var item = { id: mss.allItems.length, label: $d.find('input').val() };
-                    mss.insertItem(item);
-                    mss.allItems.push(item);
-                    $d.dialog('close');
-                }
-            } ]
-        });
+            $('#my-new-flavor').dialog({
+                title: 'Add Flavor',
+                width: 300,
+                height: 250,
+                autoOpen: false,
+                buttons: [ {
+                    text: 'Save',
+                    click: function (e) {
+                        var $d = $(this);
+                        var mss = $d.data('mss_obj');
+                        var item = { id: mss.allItems.length, label: $d.find('input').val() };
+                        mss.insertItem(item);
+                        mss.allItems.push(item);
+                        mss.broadcastEvent('newItemInsert', { 'item': item });
+                        $d.dialog('close');
+                    }
+                } ]
+            });
 
-        }( jQuery ));
-    </script>
-
-    <h2>Text entry Example</h2>
-
-    <div id="my-text-example" class="example">
-        <p class="help">Type any human language and hit enter.  Drag to reorder, and click the x to remove a language.</p>
-        <input type="text" id="my-text-elem" name="languages" value='["English","French","German","Korean"]' />
-    </div>
-
-    <script>
-        $(function($) {
-            $('#my-text-elem').multisortselect({ autocomplete: false, textentry: true });
         }( jQuery ));
     </script>
 
