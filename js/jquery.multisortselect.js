@@ -234,13 +234,22 @@
             this.allItems = new Array;
             this.featuredItems = new Array;
 
+            // Set up the backend object
+            var backend_type = typeof this.opts.backend;
+            if (backend_type == 'object' && this.opts.backend instanceof Array) {
+                backend_type = 'array';
+            }
+            if (backend_type == 'object') {
+                this.backend = new MSS_Backend(this, this.opts.backend);
+            } else if (backend_type == 'function' || backend_type == 'string' || backend_type == 'array') {
+                this.backend = new MSS_Backend(this, { call_all: this.opts.backend });
+            } else {
+                throw 'Backend not supported';
+            }
+
             // Prep the item list, if we already have one
-            if (typeof(this.opts.backend) == 'object') {
-                this.allItems = this.opts.backend;
-                this.fetchedAll = true;
-                for (var i = 0; i < this.allItems.length; i++) {
-                    this.cacheItem(this.allItems[i]);
-                }
+            if (this.backend.hasAllItems()) {
+                this.backend.callForAllItems();
             }
 
             // Initialize the node
@@ -264,7 +273,7 @@
             if (this.opts.entry_type == 'autocomplete') {
                 var entry_opts = $.extend({}, this.opts.entry);
                 if (typeof entry_opts.source == 'undefined') {
-                    entry_opts.source = this.opts.backend;
+                    entry_opts.source = this.backend.getAutocompleteSource();
                 }
                 this.entryObj = new MSS_Entry_Autocomplete(this, entry_opts);
             } else if (this.opts.entry_type == 'text') {
@@ -294,7 +303,7 @@
             }
 
             // Add featured button, if requested
-            if (typeof this.opts.featured == 'function') {
+            if (this.opts.show_featured) {
                 var button = '<a href="#" class="btn multisortselect-featured_button">Featured</a>';
                 this.$node.append(button);
                 this.$featured_button = this.$node.find('.multisortselect-featured_button');
@@ -312,51 +321,36 @@
             // Load up the list with default items
             var defaults = this.$input.val();
             if (defaults != '') {
-                this.loadDefaults(defaults);
+                try {
+                    var iids = $.parseJSON(defaults);
+                    this.backend.callForDefaults(defaults);
+                } catch (err) {
+                    this.debug('defaults parse error: ' + defaults);
+                    this.debug(err);
+                }
             }
         },
 
         // }}}
-        // {{{ loadDefaults()
+        // {{{ setAllItems()
 
         /**
-         * Loads the list with defaults
+         * Resets the list of all items and clears the cache
          *
-         * @param string defaults json describing the items
+         * @param  Array items the list of all items
+         * @throws if the parameter passed in was not an array
          */
-        loadDefaults: function(defaults) {
-            if (typeof(this.opts.backend) == 'string') {
-                $.ajax({
-                    'type': 'GET',
-                    'url': this.opts.backend,
-                    'data': { 'defaults': defaults },
-                    'dataType': 'json',
-                    'context': { self: this, call: 'loadDefaults' },
-                    'success': function (data) {
-                        for (var i = 0; i < data.length; i++) {
-                            this.self.cacheItem(data[i]);
-                            this.self.insertItem(data[i], false);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-            } else {
-                var item_ids = new Array;
-                try {
-                    var item_ids = JSON.parse(defaults);
-                } catch (ex) {
-                    console.log(ex);
-                }
-                for (var i = 0; i < item_ids.length; i++) {
-                    var item = null;
-                    if (typeof(this.cache[item_ids[i]]) == 'object') {
-                        item = this.cache[item_ids[i]];
-                    } else {
-                        item = this.buildItemFromId(item_ids[i]);
-                    }
-                    this.insertItem(item, false);
-                }
+        setAllItems: function(items) {
+            if (typeof items != 'object' || !(items instanceof Array)) {
+                throw 'setAllItems() requires an object list';
             }
+            this.allItems = new Array();
+            this.cache = {};
+            for (var i = 0; i < data.length; i++) {
+                this.cacheItem(data[i]);
+                this.allItems.push(data[i]);
+            }
+            this.fetchedAll = true;
         },
 
         // }}}
@@ -390,136 +384,6 @@
                     fn(params, this);
                 }
             }
-        },
-
-        // }}}
-        // {{{ callForAllItems()
-
-        /**
-         * Calls out for a list of all items
-         *
-         * @param  function  handler a function that handles the list of all items
-         *                           (args: item array, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForAllItems: function(handler, pass) {
-            if (typeof handler != 'function') {
-                throw 'Handler must be a function';
-            } else if (typeof this.allItems != 'string') {
-                handler(this.allItems, pass);
-                return;
-            } else if (typeof(this.opts.backend) == 'string') {
-                $.ajax({
-                    'type': 'GET',
-                    'url': this.opts.backend,
-                    'data': { 'all': true },
-                    'dataType': 'json',
-                    'context': { self: this, call: 'callForAllItems', pass: pass, handler: handler },
-                    'success': function (data) {
-                        this.self.allItems = new Array();
-                        for (var i = 0; i < data.length; i++) {
-                            this.self.cacheItem(data[i]);
-                            this.self.allItems.push(data[i]);
-                        }
-                        this.self.fetchedAll = true;
-                        this.handler(this.self.allItems, this.pass);
-                    },
-                    'error': this.handleAjaxError
-                });
-            } else {
-                this.debug('Cannot retrieve all items');
-            }
-        },
-
-        // }}}
-        // {{{ callForItemById()
-
-        /**
-         * Calls out for an item by its id
-         *
-         * @param  mixed     iid     the item id
-         * @param  function  handler a function that handles the item (args:
-         *                           item, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForItemById: function(iid, handler, pass) {
-            if (typeof handler != 'function') {
-                throw 'Handler must be a function';
-            }
-
-            if (iid == MultiSortSelect.new_id) {
-                this.callForNewItem('', handler, pass);
-                return;
-            }
-
-            if (typeof this.cache[iid] != 'undefined') {
-                handler(this.cache[iid], pass);
-                return;
-            }
-
-            if (typeof(this.opts.backend) == 'string') {
-                var arr = new Array(iid);
-                $.ajax({
-                    'type': 'GET',
-                    'url': this.opts.backend,
-                    'data': { 'defaults': JSON.stringify(arr) },
-                    'dataType': 'json',
-                    'context': { self: this, call: 'callForItemById', pass: pass, handler: handler },
-                    'success': function (data) {
-                        for (var i = 0; i < data.length; i++) {
-                            this.self.cacheItem(data[i]);
-                            this.handler(data[i], this.pass);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-                return;
-            }
-
-            this.debug('Cannot retrieve item by id');
-        },
-
-        // }}}
-        // {{{ callForNewItem()
-
-        /**
-         * Calls out for a new item, possibly given some text
-         *
-         * @param  string    entry   something from which to build the item
-         * @param  function  handler a function that handles the item (args:
-         *                           item, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForNewItem: function(entry, handler, pass) {
-            if (typeof handler != 'function') {
-                throw 'Handler must be a function';
-            }
-
-            if (typeof(this.opts.backend) == 'string') {
-                $.ajax({
-                    'type': 'POST',
-                    'url': this.opts.backend,
-                    'data': { 'new': entry },
-                    'dataType': 'json',
-                    'context': { self: this, call: 'callForNewItem', pass: pass, handler: handler },
-                    'success': function (data) {
-                        this.self.cacheItem(data);
-                        this.self.broadcastEvent('newItemInsert', { 'item': item });
-                        this.handler(data, this.pass);
-                    },
-                    'error': this.handleAjaxError
-                });
-                return;
-            }
-
-            var item = this.buildPlaceholderFromEntry(entry);
-            handler(item, pass);
         },
 
         // }}}
@@ -620,14 +484,33 @@
         /**
          * Returns whether we have a cached item
          *
-         * @param  object item    the item
-         * @return bool   whether the item is cached
+         * @param  mixed iid the item id
+         * @return bool  whether the item is cached
          */
-        hasCachedItem: function(item) {
+        hasCachedItem: function(iid) {
             if (typeof(this.cache) == 'string') {
                 return false;
             }
-            return (typeof this.cache[item.id] != 'undefined');
+            return (typeof this.cache[iid] != 'undefined');
+        },
+
+        // }}}
+        // {{{ getCachedItem()
+
+        /**
+         * Returns a cached item
+         *
+         * @param  mixed  iid the item id
+         * @return object the item, or false if not found
+         */
+        getCachedItem: function(iid) {
+            if (typeof(this.cache) == 'string') {
+                return false;
+            }
+            if (typeof this.cache[iid] != 'undefined') {
+                return this.cache[iid];
+            }
+            return false;
         },
 
         // }}}
@@ -690,13 +573,30 @@
             $li.find('.multisortselect-remove').click(MultiSortSelect.eventRemoveItem);
             this.$list.append($li);
 
-            if (!this.hasCachedItem(item)) {
-                this.cacheItem(item);
+            if (!this.hasCachedItem(item.id)) {
+// TODO: debug
+console.log(item);
+                this.cacheItem(item.id);
             }
 
             if (typeof this.opts.after_add == 'function') {
                 this.opts.after_add($li);
             }
+        },
+
+        // }}}
+        // {{{ insertNewItem()
+
+        /**
+         * Adds a new item to the list
+         *
+         * @param object item the new item
+         */
+        insertNewItem: function(item) {
+            this.mss.cacheItem(item);
+            this.mss.allItems.push(item);
+            this.mss.broadcastEvent('newItemInsert', { 'item': item });
+            this.insertItem(item);
         },
 
         // }}}
@@ -709,27 +609,11 @@
          * @param bool update whether to update the value
          */
         insertItemById: function(iid, update) {
-            if (iid == MultiSortSelect.new_id) {
-                return this.insertItem(this.buildPlaceholderFromEntry(''), update);
-            } else if (typeof(this.cache[iid]) == 'object') {
-                return this.insertItem(this.cache[iid], update);
-            } else {
-                var arr = new Array(iid);
-                $.ajax({
-                    'type': 'GET',
-                    'url': this.opts.backend,
-                    'data': { 'defaults': JSON.stringify(arr) },
-                    'dataType': 'json',
-                    'context': { self: this, call: 'insertItemById', update: update },
-                    'success': function (data) {
-                        for (var i = 0; i < data.length; i++) {
-                            this.self.cacheItem(data[i]);
-                            this.self.insertItem(data[i], this.update);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-            }
+            var handler = function (item, pass) {
+                pass.mss.insertItem(item, pass.update);
+            };
+            var pass = { mss: this, update: update };
+            this.backend.callForItemById(iid, handler, pass);
         },
 
         // }}}
@@ -777,25 +661,15 @@
          */
         showAll: function() {
             if (!this.fetchedAll) {
-                $.ajax({
-                    'type': 'GET',
-                    'url': this.opts.backend,
-                    'data': { 'all': true },
-                    'dataType': 'json',
-                    'context': { self: this, call: 'showAll' },
-                    'success': function (data) {
-                        this.self.allItems = new Array();
-                        for (var i = 0; i < data.length; i++) {
-                            this.self.cacheItem(data[i]);
-                            this.self.allItems.push(data[i]);
-                        }
-                        this.self.fetchedAll = true;
-                        this.self.showAll();
-                    },
-                    'error': this.handleAjaxError
-                });
+                var handler = function (items, pass) {
+                    pass.mss.fetchedAll = true;
+                    pass.mss.showAll();
+                };
+                var pass = { mss: this };
+                this.backend.callForAllItems(handler, pass);
+                return;
             }
-            if (this.fetchedAll && !this.builtShowAll) {
+            if (!this.builtShowAll) {
                 for (var i = 0; i < this.allItems.length; i++) {
                     var item = this.allItems[i];
                     var $li = $('<li></li>');
@@ -806,9 +680,7 @@
                 }
                 this.builtShowAll = true;
             }
-            if (this.builtShowAll) {
-                this.$showall.toggle();
-            }
+            this.$showall.toggle();
         },
 
         // }}}
@@ -818,11 +690,16 @@
          * Shows the featured options
          */
         showFeatured: function() {
-            if (typeof this.opts.featured == 'function' && (!this.opts.cache_featured || !this.fetchedFeatured)) {
-                this.featuredItems = this.opts.featured(this);
-                this.fetchedFeatured = true;
+            if (!this.opts.show_featured) {
+                return;
             }
-            if (this.fetchedFeatured && (!this.opts.cache_featured || !this.builtFeatured)) {
+            if (!this.opts.cache_featured || !this.fetchedFeatured) {
+                this.backend.callForFeaturedItems(function(items, pass) {
+                    pass.mss.showFeatured();
+                }, { mss: this });
+                return;
+            }
+            if (!this.opts.cache_featured || !this.builtFeatured) {
                 for (var i = 0; i < this.featuredItems.length; i++) {
                     var item = this.featuredItems[i];
                     var $li = $('<li></li>');
@@ -833,9 +710,28 @@
                 }
                 this.builtFeatured = true;
             }
-            if (this.builtFeatured) {
-                this.$featured.toggle();
+            this.$featured.toggle();
+        },
+
+        // }}}
+        // {{{ setFeaturedItems()
+
+        /**
+         * Sets the list of featured items
+         *
+         * @param  Array items the list of featured items
+         * @throws if the parameter passed in was not an array
+         */
+        setFeaturedItems: function(items) {
+            if (typeof items != 'object' || !(items instanceof Array)) {
+                throw 'cacheFeaturedItems() requires an object list';
             }
+            this.featuredItems = new Array();
+            for (var i = 0; i < items.length; i++) {
+                this.cacheItem(items[i]);
+                this.featuredItems.push(items[i]);
+            }
+            this.fetchedFeatured = true;
         },
 
         // }}}
@@ -888,6 +784,477 @@
          */
         debug: function(obj) {
             MultiSortSelect.debug(obj);
+        }
+
+        // }}}
+
+    });
+
+    // }}}
+
+    // }}}
+    // {{{ MSS_Backend class
+
+    // {{{ Constructor
+
+    /**
+     * Initializes a new object
+     *
+     * @param MultiSortSelect mss   the associated MultiSortSelect object
+     * @param mixed           setup the info necessary to set up
+     */
+    MSS_Backend = function($el, setup) {
+        this.init($el, setup);
+    }
+
+    // }}}
+    // {{{ Prototype
+
+    $.extend(MSS_Backend.prototype, {
+
+        // {{{ Object variables
+
+        mss: null,
+        opts: {},
+
+        // }}}
+        // {{{ init()
+
+        /**
+         * Init method, run only once, on launch
+         *
+         * @param MultiSortSelect mss  the associated MultiSortSelect object
+         * @param object          opts any custom options
+         */
+        init: function(mss, opts) {
+            this.mss = mss;
+            this.opts = $.extend({}, MSS_Backend.default_opts, opts);
+        },
+
+        // }}}
+        // {{{ findCaller()
+
+        /**
+         * Finds the caller for a call type
+         *
+         * @param  string call_type the type of call
+         * @return mixed  the caller
+         * @throws exception if the call cannot be made
+         */
+        findCaller: function(call_type, primary, secondary, pass) {
+            if (typeof this.opts['call_' + call_type] != 'undefined') {
+                return this.opts['call_' + call_type];
+            } else if (typeof this.opts.call_all != 'undefined') {
+                return this.opts.call_all;
+            } else {
+                throw 'Caller for ' + call_type + ' not found';
+            }
+        },
+
+        // }}}
+        // {{{ getCallerType()
+
+        /**
+         * Gets the type of caller
+         *
+         * @param  mixed  the caller
+         * @return string the caller type
+         * @throws exception if the caller type is unknown
+         */
+        getCallerType: function(caller) {
+            if (typeof caller == 'string') {
+                return 'ajax';
+            } else if (typeof caller == 'function') {
+                return 'function';
+            } else if (typeof caller == 'object' && caller instanceof Array) {
+                return 'array';
+            } else {
+                throw 'Call type unknown';
+            }
+        },
+
+        // }}}
+        // {{{ hasAllItems()
+
+        /**
+         * Returns whether the backend has a list of all items
+         *
+         * @return bool whether the backend is an array
+         */
+        hasAllItems: function() {
+            var caller = this.findCaller('AllItems');
+            var caller_type = this.getCallerType(caller);
+            return (caller_type == 'array');
+        },
+
+        // }}}
+        // {{{ getAutocompleteSource
+
+        /**
+         * Returns the proper source for the autocomplete plugin
+         *
+         * @return mixed the source
+         */
+        getAutocompleteSource: function() {
+            var caller = this.findCaller('Search');
+            var caller_type = this.getCallerType(caller);
+            if (caller_type == 'ajax' || caller_type == 'array') {
+                return caller;
+            }
+        },
+
+        // }}}
+        // {{{ callForItemById()
+
+        /**
+         * Calls out for an item by its id
+         *
+         * @param  mixed     iid     the item id
+         * @param  function  handler a function that handles the item (args:
+         *                           item, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForItemById: function(iid, handler, pass) {
+            var METHOD = 'ItemById';
+
+            // New item?  Call for that.
+            if (iid == MultiSortSelect.new_id) {
+                this.callForNewItem('', handler, pass);
+                return;
+            }
+
+            // Do we already have it?
+            var cached = this.mss.getCachedItem(iid);
+            if (cached) {
+                if (typeof handler == 'function') {
+                    handler(cached, pass);
+                }
+                return;
+            }
+
+            // Call for it
+            var caller = this.findCaller(METHOD);
+            var caller_type = this.getCallerType(caller);
+
+            // Ajax call
+            if (caller_type == 'ajax') {
+                var arr = new Array;
+                arr.push(iid);
+                $.ajax({
+                    'type': 'GET',
+                    'url': caller,
+                    'data': { 'defaults': JSON.stringify(arr) },
+                    'dataType': 'json',
+                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
+                    'success': function (data) {
+                        for (var i = 0; i < data.length; i++) {
+                            this.mss.cacheItem(data[i]);
+                            if (typeof this.handler == 'function') {
+                                this.handler(data[i], this.pass);
+                            }
+                        }
+                    },
+                    'error': this.handleAjaxError
+                });
+
+            // Function call
+            } else if (caller_type == 'function') {
+                var wrap_handler = function(item, wrap_pass) {
+                    wrap_pass.mss.cacheItem(item);
+                    if (typeof wrap_pass.handler == 'function') {
+                        wrap_pass.handler(item, wrap_pass.pass);
+                    }
+                };
+                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
+                caller(this.mss, METHOD, wrap_handler, wrap_pass, iid);
+
+            // Pull from array
+            } else if (caller_type == 'array') {
+                var item = null;
+                for (var i = 0; i < caller.length; i++) {
+                    if (caller[i].id == iid) {
+                        item = caller[i];
+                        break;
+                    }
+                }
+                if (typeof item == 'object' && typeof handler == 'function') {
+                    handler(item, pass);
+                }
+            }
+        },
+
+        // }}}
+        // {{{ callForNewItem()
+
+        /**
+         * Calls out for a new item, possibly given some text
+         *
+         * @param  string    entry   something from which to build the item
+         * @param  function  handler a function that handles the item (args:
+         *                           item, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForNewItem: function(entry, handler, pass) {
+            var METHOD = 'NewItem';
+
+            // Call for it
+            var caller = this.findCaller(METHOD);
+            var caller_type = this.getCallerType(caller);
+
+            // Ajax call
+            if (caller_type == 'ajax') {
+                var arr = new Array;
+                arr.push(iid);
+                $.ajax({
+                    'type': 'POST',
+                    'url': caller,
+                    'data': { 'new': entry },
+                    'dataType': 'json',
+                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
+                    'success': function (data) {
+                        this.mss.insertNewItem(data);
+                        if (typeof this.handler == 'function') {
+                            this.handler(data, this.pass);
+                        }
+                    },
+                    'error': this.handleAjaxError
+                });
+
+            // Function call
+            } else if (caller_type == 'function') {
+                var wrap_handler = function(item, wrap_pass) {
+                    wrap_pass.mss.insertNewItem(item);
+                    if (typeof wrap_pass.handler == 'function') {
+                        wrap_pass.handler(item, wrap_pass.pass);
+                    }
+                };
+                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
+                caller(this.mss, METHOD, wrap_handler, wrap_pass, entry);
+
+            // Array backend: run through mss build
+            } else if (caller_type == 'array') {
+                var item = this.mss.buildItemFromEntry(entry);
+                if (typeof item == 'object' && typeof handler == 'function') {
+                    handler(item, pass);
+                }
+            }
+
+        },
+
+        // }}}
+        // {{{ callForDefaults()
+
+        /**
+         * Calls out for a set of items by their ids
+         *
+         * @param  array     iids    the item ids
+         * @param  function  handler a function that handles the items (args:
+         *                           items, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForDefaults: function(defaults, handler, pass) {
+            var METHOD = 'Defaults';
+
+            // Do we already have them?
+            var cached = new Array;
+            for (var i = 0; i < defaults.length; i++) {
+                var item = this.mss.getCachedItem(defaults[i]);
+                if (item) {
+                    cached.push(item);
+                }
+            }
+            if (cached.length == defaults.length) {
+                for (var i = 0; i < cached.length; i++) {
+                    this.mss.cacheItem(cached[i]);
+                    this.mss.insertItem(cached[i], false);
+                }
+                if (typeof handler == 'function') {
+                    handler(cached, pass);
+                }
+                return;
+            }
+
+            // Call for them
+            var caller = this.findCaller(METHOD);
+            var caller_type = this.getCallerType(caller);
+
+            // Ajax call
+            if (caller_type == 'ajax') {
+                $.ajax({
+                    'type': 'GET',
+                    'url': caller,
+                    'data': { 'defaults': JSON.stringify(defaults) },
+                    'dataType': 'json',
+                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
+                    'success': function (data) {
+                        for (var i = 0; i < data.length; i++) {
+                            this.mss.cacheItem(data[i]);
+                            this.mss.insertItem(data[i], false);
+                        }
+                        if (typeof this.handler == 'function') {
+                            this.handler(data, this.pass);
+                        }
+                    },
+                    'error': this.handleAjaxError
+                });
+
+            // Function call
+            } else if (caller_type == 'function') {
+                var wrap_handler = function(items, wrap_pass) {
+                    for (var i = 0; i < items.length; i++) {
+                        wrap_pass.mss.cacheItem(items[i]);
+                        wrap_pass.mss.insertItem(items[i], false);
+                    }
+                    if (typeof wrap_pass.handler == 'function') {
+                        wrap_pass.handler(items, wrap_pass.pass);
+                    }
+                };
+                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
+                caller(this.mss, METHOD, wrap_handler, wrap_pass, defaults);
+
+            // Pull from array
+            } else if (caller_type == 'array') {
+                var found = new Array;
+                for (var j = 0; j < defaults.length; i++) {
+                    if (this.mss.hasCachedItem(defaults[i])) {
+                        var item = this.mss.getCachedItem(defaults[i]);
+                    } else {
+                        var item = this.mss.buildItemFromId(defaults[i]);
+                    }
+                    this.mss.insertItem(item, false);
+                    found.push(item);
+                }
+                if (typeof handler == 'function') {
+                    handler(found, pass);
+                }
+            }
+
+        },
+
+        // }}}
+        // {{{ callForAllItems()
+
+        /**
+         * Calls out for a list of all items
+         *
+         * @param  function  handler a function that handles the list of all items
+         *                           (args: item array, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForAllItems: function(handler, pass) {
+            var METHOD = 'AllItems';
+
+            // Already got them?
+            if (typeof this.mss.allItems != 'string') {
+                if (typeof handler == 'function') {
+                    handler(this.mss.allItems, pass);
+                }
+                return;
+            }
+
+            // Call for them
+            var caller = this.findCaller(METHOD);
+            var caller_type = this.getCallerType(caller);
+
+            // Ajax call
+            if (caller_type == 'ajax') {
+                $.ajax({
+                    'type': 'GET',
+                    'url': caller,
+                    'data': { 'all': true },
+                    'dataType': 'json',
+                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
+                    'success': function (data) {
+                        this.mss.setAllItems(data);
+                        if (typeof this.handler == 'function') {
+                            this.handler(data, this.pass);
+                        }
+                    },
+                    'error': this.handleAjaxError
+                });
+
+            // Function call
+            } else if (caller_type == 'function') {
+                var wrap_handler = function(items, wrap_pass) {
+                    wrap_pass.mss.setAllItems(items);
+                    if (typeof wrap_pass.handler == 'function') {
+                        wrap_pass.handler(items, wrap_pass.pass);
+                    }
+                };
+                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
+                caller(this.mss, METHOD, wrap_handler, wrap_pass);
+
+            // Pull from array
+            } else if (caller_type == 'array') {
+                this.mss.setAllItems(caller);
+                if (typeof handler == 'function') {
+                    handler(caller, pass);
+                }
+            }
+        },
+
+        // }}}
+        // {{{ callForFeaturedItems()
+
+        /**
+         * Calls out for a list of featured items
+         *
+         * @param  function  handler a function that handles the list of all items
+         *                           (args: item array, pass object)
+         * @param  object    pass    an object containing anything the function
+         *                           needs passed to it
+         * @throws exception if the handler is not a function
+         */
+        callForFeaturedItems: function(handler, pass) {
+            var METHOD = 'FeaturedItems';
+
+            // Call for them
+            var caller = this.findCaller(METHOD);
+            var caller_type = this.getCallerType(caller);
+
+            // Ajax call
+            if (caller_type == 'ajax') {
+                $.ajax({
+                    'type': 'GET',
+                    'url': caller,
+                    'data': { 'featured': true },
+                    'dataType': 'json',
+                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
+                    'success': function (data) {
+                        this.mss.setFeaturedItems(data);
+                        if (typeof this.handler == 'function') {
+                            this.handler(data, this.pass);
+                        }
+                    },
+                    'error': this.handleAjaxError
+                });
+
+            // Function call
+            } else if (caller_type == 'function') {
+                var wrap_handler = function(items, wrap_pass) {
+                    wrap_pass.mss.setFeaturedItems(items);
+                    if (typeof wrap_pass.handler == 'function') {
+                        wrap_pass.handler(items, wrap_pass.pass);
+                    }
+                };
+                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
+                caller(this.mss, METHOD, wrap_handler, wrap_pass);
+
+            // Pull from array
+            } else if (caller_type == 'array') {
+                this.mss.setFeaturedItems(caller);
+                if (typeof handler == 'function') {
+                    handler(caller, pass);
+                }
+            }
         }
 
         // }}}
@@ -1137,7 +1504,7 @@
             if (this.mss.opts.allow_new) {
                 this.addSelectOption(this.mss.buildPlaceholderFromEntry('', this.opts.new_label), $entry.find('select'));
             }
-            this.mss.callForAllItems(function (items, pass) {
+            this.mss.backend.callForAllItems(function (items, pass) {
                 for (var i = 0; i < items.length; i++) {
                     pass.entry.addSelectOption(items[i], pass.$select);
                 }
