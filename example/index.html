@@ -104,21 +104,27 @@
 
     <script>
         $(function($) {
-            $('#my-featured-elem').multisortselect({ backend: programming_langugages, featured: function (mss) {
-                var featured = new Array;
-                for (var i = 0; i < programming_langugages.length; i++) {
-                    if (programming_langugages[i].label.match(/javascript/i)
-                        || programming_langugages[i].label.match(/perl/i)
-                        || programming_langugages[i].label.match(/php/i)
-                        || programming_langugages[i].label.match(/shell/i)
-                        || programming_langugages[i].label.match(/basic/i)
-                        || programming_langugages[i].label.match(/java/i)
-                    ) {
-                        featured.push(programming_langugages[i]);
+            $('#my-featured-elem').multisortselect({
+                backend: {
+                    call_all: programming_langugages,
+                    call_FeaturedItems: function (mss, method, handler, pass) {
+                        var featured = new Array;
+                        for (var i = 0; i < programming_langugages.length; i++) {
+                            if (programming_langugages[i].label.match(/javascript/i)
+                                || programming_langugages[i].label.match(/perl/i)
+                                || programming_langugages[i].label.match(/php/i)
+                                || programming_langugages[i].label.match(/shell/i)
+                                || programming_langugages[i].label.match(/basic/i)
+                                || programming_langugages[i].label.match(/java/i)
+                            ) {
+                                featured.push(programming_langugages[i]);
+                            }
+                        }
+                        handler(featured, pass);
                     }
-                }
-                return featured;
-            } });
+                },
+                show_featured: true
+            });
         }( jQuery ));
     </script>
 
