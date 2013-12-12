@@ -414,8 +414,8 @@
          * @return object an object usable here
          */
         buildItemFromEntry: function(entry) {
-            if (typeof this.opts.build == 'function') {
-                return this.opts.build(entry);
+            if (typeof this.opts.build_item == 'function') {
+                return this.opts.build_item(entry, this);
             }
             return { id: entry, label: entry, value: entry };
         },
@@ -449,8 +449,8 @@
          * @return object an object usable here
          */
         buildItemFromId: function(id) {
-            if (typeof this.opts.build == 'function') {
-                return this.opts.build(null, id);
+            if (typeof this.opts.build_item == 'function') {
+                return this.opts.build_item(id, this);
             }
             return { id: id, label: id, value: id };
         },
