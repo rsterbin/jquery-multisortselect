@@ -230,9 +230,9 @@
             };
 
             // Initialize tracking properties
+            this.allItems = '';
             this.currentIds = new Array;
-            this.allItems = new Array;
-            this.featuredItems = new Array;
+            this.featuredItems = '';
 
             // Set up the backend object
             var backend_type = typeof this.opts.backend;
@@ -323,10 +323,12 @@
             if (defaults != '') {
                 try {
                     var iids = $.parseJSON(defaults);
-                    this.backend.callForDefaults(defaults);
                 } catch (err) {
                     this.debug('defaults parse error: ' + defaults);
                     this.debug(err);
+                }
+                if (iids) {
+                    this.backend.callForDefaults(iids);
                 }
             }
         },
@@ -346,9 +348,9 @@
             }
             this.allItems = new Array();
             this.cache = {};
-            for (var i = 0; i < data.length; i++) {
-                this.cacheItem(data[i]);
-                this.allItems.push(data[i]);
+            for (var i = 0; i < items.length; i++) {
+                this.cacheItem(items[i]);
+                this.allItems.push(items[i]);
             }
             this.fetchedAll = true;
         },
@@ -574,8 +576,6 @@
             this.$list.append($li);
 
             if (!this.hasCachedItem(item.id)) {
-// TODO: debug
-console.log(item);
                 this.cacheItem(item.id);
             }
 
@@ -1121,11 +1121,12 @@ console.log(item);
             // Pull from array
             } else if (caller_type == 'array') {
                 var found = new Array;
-                for (var j = 0; j < defaults.length; i++) {
-                    if (this.mss.hasCachedItem(defaults[i])) {
-                        var item = this.mss.getCachedItem(defaults[i]);
+                for (var j = 0; j < defaults.length; j++) {
+                    var item;
+                    if (this.mss.hasCachedItem(defaults[j])) {
+                        item = this.mss.getCachedItem(defaults[j]);
                     } else {
-                        var item = this.mss.buildItemFromId(defaults[i]);
+                        item = this.mss.buildItemFromId(defaults[j]);
                     }
                     this.mss.insertItem(item, false);
                     found.push(item);
@@ -1438,7 +1439,7 @@ console.log(item);
         var mss = MultiSortSelect.objectFromElem($(this));
         if (mss) {
             var $s = mss.$entry.find('select');
-            mss.callForItemById($s.val(), function (item, pass) {
+            mss.backend.callForItemById($s.val(), function (item, pass) {
                 pass.mss.insertItem(item, true);
             }, { mss: mss, update: true });
             $s.val('');
