@@ -1,0 +1,97 @@
+/* Widths -- override this for custom styling */
+
+.multisortselect {
+    width: 350px;
+}
+
+.multisortselect-list-item .multisortselect-item {
+    width: 318px;
+}
+
+.multisortselect-chooser-item .multisortselect-item {
+    width: 324px;
+}
+
+/* Basics */
+.multisortselect {
+    padding: 0.5em 0.2em;
+}
+
+.multisortselect-list,
+.multisortselect-chooser {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    padding-bottom: 0.2em;
+}
+
+.multisortselect-chooser {
+    margin: 0.5em 0.2em;
+}
+
+.multisortselect-list-item,
+.multisortselect-chooser-item {
+    display: block;
+    overflow: auto;
+    padding: 0.2em 0;
+    padding-bottom: 0.5em;
+}
+
+.multisortselect-list-item .multisortselect-move-icon,
+.multisortselect-chooser-item .multisortselect-move-icon,
+.multisortselect-list-item .multisortselect-add-icon,
+.multisortselect-chooser-item .multisortselect-add-icon,
+.multisortselect-list-item .multisortselect-item,
+.multisortselect-chooser-item .multisortselect-item {
+    float: left;
+}
+
+.multisortselect-list-item .multisortselect-move-icon,
+.multisortselect-list-item .multisortselect-add-icon,
+.multisortselect-list-item .multisortselect-item {
+    cursor: move;
+}
+
+.multisortselect-chooser-item .multisortselect-move-icon,
+.multisortselect-chooser-item .multisortselect-add-icon,
+.multisortselect-chooser-item .multisortselect-item {
+    cursor: pointer;
+}
+
+.multisortselect-remove {
+    float: right;
+}
+
+.multisortselect-entry {
+    display: inline-block;
+    margin-left: 0.5em;
+}
+
+.multisortselect-button {
+    display: inline-block;
+    margin-left: 0.5em;
+}
+
+/* UI fixes */
+
+.ui-widget.multisortselect {
+    font-size: 1em;
+}
+
+.ui-widget .multisortselect-list-item,
+.ui-widget .multisortselect-chooser-item {
+    font-size: 0.9em;
+}
+
+.ui-widget input.multisortselect-entry {
+    font-size: 1.1em;
+}
+
+.ui-widget select.multisortselect-select {
+    font-size: 1.1em;
+}
+
+.ui-widget .multisortselect-button {
+    font-size: 0.7em;
+}
+

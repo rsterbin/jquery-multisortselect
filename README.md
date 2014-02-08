@@ -85,6 +85,9 @@ Important Notes
   function that returns the list of items you want.  Set `cache_featured` to
   false if you want to call it on every button press.
 
+* If you don't want to use JQuery UI styling, set `ui` to `false` and add your
+  own styles.
+
 Options
 -------
 
@@ -93,6 +96,7 @@ Options
 | `entry_type`       | string   | `autocomplete`                           | the entry type: `autocomplete` (default), `select` or `text` |
 | `backend`          | mixed    | _none_                                   | how to get the objects (array or url)                        |
 | `format`           | function | `function (item) { return item.label; }` | how to display the element in the list                       |
+| `ui`               | boolean  | `true`                                   | whether to use jquery ui markup and classes                  |
 | `unique`           | boolean  | `true`                                   | whether to allow only one copy of any id                     |
 | `match`            | function | _none_                                   | use this to determine whether two ids are the same           |
 | `top_class`        | string   | _none_                                   | set this class on the wrapper div                            |

@@ -33,6 +33,7 @@
         entry_type: 'autocomplete',
         backend: [],
         format: function (item) { return item.label; },
+        ui: true,
         unique: true,
         show_all: false,
         cache_featured: true,
@@ -259,6 +260,11 @@
             if (this.opts.top_class) {
                 this.$node.addClass(this.opts.top_class);
             }
+            if (this.opts.ui) {
+                this.$node.addClass('ui-widget')
+                    .addClass('ui-widget-content')
+                    .addClass('ui-corner-all');
+            }
 
             // Add the list
             var list = '<ul class="multisortselect-list"></ul>';
@@ -292,11 +298,14 @@
 
             // Add show-all button, if requested
             if (this.opts.show_all) {
-                var button = '<a href="#" class="btn multisortselect-showall_button">Show All</a>';
+                var button = '<a href="#" class="multisortselect-showall_button multisortselect-button">Show All</a>';
                 this.$node.append(button);
                 this.$showall_button = this.$node.find('.multisortselect-showall_button');
                 this.$showall_button.click(MultiSortSelect.eventShowAll);
-                var showall = '<ul class="multisortselect-showall"></ul>';
+                if (this.opts.ui) {
+                    this.$showall_button.button({ icons: { primary: 'ui-icon-circle-triangle-s' } });
+                }
+                var showall = '<ul class="multisortselect-showall multisortselect-chooser"></ul>';
                 this.$node.append(showall);
                 this.$showall = this.$node.find('.multisortselect-showall');
                 this.$showall.hide();
@@ -304,11 +313,14 @@
 
             // Add featured button, if requested
             if (this.opts.show_featured) {
-                var button = '<a href="#" class="btn multisortselect-featured_button">Featured</a>';
+                var button = '<a href="#" class="multisortselect-featured_button multisortselect-button">Featured</a>';
                 this.$node.append(button);
                 this.$featured_button = this.$node.find('.multisortselect-featured_button');
                 this.$featured_button.click(MultiSortSelect.eventShowFeatured);
-                var flist = '<ul class="multisortselect-featured"></ul>';
+                if (this.opts.ui) {
+                    this.$featured_button.button({ icons: { primary: 'ui-icon-circle-triangle-s' } });
+                }
+                var flist = '<ul class="multisortselect-featured multisortselect-chooser"></ul>';
                 this.$node.append(flist);
                 this.$featured = this.$node.find('.multisortselect-featured');
                 this.$featured.hide();
@@ -567,11 +579,21 @@
             }
 
             var $li = $('<li class="multisortselect-list-item">' +
+                    '<span class="multisortselect-move-icon"></span>' +
                     '<div class="multisortselect-item"></div>' +
                     '<a href="#" class="multisortselect-remove" title="Remove">&#xd7;</a>' +
                 '</li>');
             $li.data('multisortselect_iid', iid);
-            $li.find('.multisortselect-item').html('<i class="icon-sort"></i>' + this.opts.format(item));
+            $li.find('.multisortselect-item').append(this.opts.format(item));
+            if (this.opts.ui) {
+                $li.find('.multisortselect-move-icon')
+                    .addClass('ui-icon')
+                    .addClass('ui-icon-triangle-2-n-s');
+                $li.find('.multisortselect-remove')
+                    .addClass('ui-icon')
+                    .addClass('ui-icon-closethick');
+            }
+
             $li.find('.multisortselect-remove').click(MultiSortSelect.eventRemoveItem);
             this.$list.append($li);
 
@@ -672,15 +694,30 @@
             if (!this.builtShowAll) {
                 for (var i = 0; i < this.allItems.length; i++) {
                     var item = this.allItems[i];
-                    var $li = $('<li></li>');
+                    var $li = $('<li class="multisortselect-chooser-item">' +
+                            '<span class="multisortselect-add-icon"></span>' +
+                            '<div class="multisortselect-item"></div>' +
+                        '</li>');
                     $li.attr('rel', item.id);
-                    $li.html('<i class="icon-plus"></i>' + this.opts.format(item));
+                    $li.find('.multisortselect-item').append(this.opts.format(item));
+                    if (this.opts.ui) {
+                        $li.find('.multisortselect-add-icon')
+                            .addClass('ui-icon')
+                            .addClass('ui-icon-plus');
+                    }
                     $li.click(MultiSortSelect.eventShowAllAdd);
                     this.$showall.append($li);
                 }
                 this.builtShowAll = true;
             }
-            this.$showall.toggle();
+            if (this.$showall.is(':visible')) {
+                this.$showall.slideUp();
+                this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-s' });
+            } else {
+                this.$showall.slideDown();
+                this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
+            }
+            this.$showall_button.refresh();
         },
 
         // }}}
@@ -702,15 +739,30 @@
             if (!this.opts.cache_featured || !this.builtFeatured) {
                 for (var i = 0; i < this.featuredItems.length; i++) {
                     var item = this.featuredItems[i];
-                    var $li = $('<li></li>');
+                    var $li = $('<li class="multisortselect-chooser-item">' +
+                            '<span class="multisortselect-add-icon"></span>' +
+                            '<div class="multisortselect-item"></div>' +
+                        '</li>');
                     $li.attr('rel', item.id);
-                    $li.html('<i class="icon-plus"></i>' + this.opts.format(item));
+                    $li.find('.multisortselect-item').append(this.opts.format(item));
+                    if (this.opts.ui) {
+                        $li.find('.multisortselect-add-icon')
+                            .addClass('ui-icon')
+                            .addClass('ui-icon-plus');
+                    }
                     $li.click(MultiSortSelect.eventShowFeaturedAdd);
                     this.$featured.append($li);
                 }
                 this.builtFeatured = true;
             }
-            this.$featured.toggle();
+            if (this.$featured.is(':visible')) {
+                this.$featured.slideUp();
+                this.$featured_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-s' });
+            } else {
+                this.$featured.slideDown();
+                this.$featured_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
+            }
+            this.$featured_button.refresh();
         },
 
         // }}}
@@ -1499,9 +1551,13 @@
         build: function() {
             var $entry = $('<div class="multisortselect-selection">' +
                 '<select class="multisortselect-select"><option value=""></option></select>' +
-                '<a href="#" class="btn multisortselect-select_button">Add</a>' +
+                '<a href="#" class="multisortselect-select_button multisortselect-button">Add</a>' +
                 '</div>');
-            $entry.find('.multisortselect-select_button').click(MSS_Entry_Select.eventAddButtonClick);
+            var $bttn = $entry.find('.multisortselect-select_button');
+            $bttn.click(MSS_Entry_Select.eventAddButtonClick);
+            if (this.mss.opts.ui) {
+                $bttn.button({ icons: { primary: 'ui-icon-plus' } });
+            }
             if (this.mss.opts.allow_new) {
                 this.addSelectOption(this.mss.buildPlaceholderFromEntry('', this.opts.new_label), $entry.find('select'));
             }

@@ -391,3 +391,15 @@ var br_31_flavors = [
     { id: 31, label: "Vanilla Burnt Almond" }
 ];
 
+// Cardinal directions
+var directions = [
+    { id: 1, label: 'North' },
+    { id: 2, label: 'Northeast' },
+    { id: 3, label: 'East' },
+    { id: 4, label: 'Southeast' },
+    { id: 5, label: 'South' },
+    { id: 6, label: 'Southwest' },
+    { id: 7, label: 'West' },
+    { id: 8, label: 'Northwest' }
+];
+
