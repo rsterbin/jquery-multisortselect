@@ -50,9 +50,16 @@ Important Notes
   describing all the options.
 
 * If you want to use the plain text entry, you can provide two functions:
-  `validate` and `build`.  The first accepts the value of the text field and
-  returns true or false, and the second accepts two parameters, the text entry
-  and the id, and returns an item object.
+  `validate` and `build_item`.  The first accepts the value of the text field
+  and returns true or false, and the second accepts two parameters, the text
+  value and the current MultiSortSelect object, and returns an item object.
+
+* If you'd like to use different backends for different calls, you can define
+  the `backend` option as a object containing keys for each call.  If you want
+  most to use the same backend and a different backend for only certain calls,
+  you can define the key `call_all` for your fallback.  A complete list of
+  backend calls is provided below.  To define a call backend, prefix its name
+  with `call_` (e.g. `call_Featured`).
 
 * If you want to allow the user to create a new item inline, set the
   `allow_new` option to true and provide `build_suggestion` and `build_item`
@@ -98,6 +105,19 @@ Options
 | `cache_featured`   | boolean  | `true`                                   | whether to cache the list of featured items                  |
 | `after_add`        | function | _none_                                   | do this after each item is added                             |
 
+
+Complex Backend Options
+-----------------------
+
+| Call name     | Key                  | Arguments  | Description                                                                      |
+|:------------- |:-------------------- |:---------- | -------------------------------------------------------------------------------- |
+| Search        | `call_Search`        | `term`     | The autocomplete search; returns a json array of objects                         |
+| ItemById      | `call_ItemById`      | `defaults` | Fetches an item by its id; ajax uses single-item arrays, but function uses plain |
+| NewItem       | `call_NewItem`       | `entry`    | Creates a new item; accepts the text entry, if applicable                        |
+| Defaults      | `call_Defaults`      | `defaults` | Fetches an array of items by an array of ids; order should be the same           |
+| AllItems      | `call_AllItems`      | `all`      | Fetches all available items; value of `all` is always true                       |
+| FeaturedItems | `call_FeaturedItems` | `featured` | Fetches all available items; value of `all` is always true                       |
+
 Minimum Example
 ---------------
 
@@ -122,8 +142,5 @@ TODO
 -----
 
  * Support for adding a new item to selectable list on the fly
- * Support for backend as a function returning the item
- * Ability to define backend types per call type (e.g., one url for search and one for new item)
  * Pluggable entry types (select, autocomplete, text, user-defined) in their own classes
- * Pluggable backend types (url, json array, function) in their own classes
 
