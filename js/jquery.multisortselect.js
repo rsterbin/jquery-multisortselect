@@ -1491,9 +1491,12 @@
         var mss = MultiSortSelect.objectFromElem($(this));
         if (mss) {
             var $s = mss.$entry.find('select');
-            mss.backend.callForItemById($s.val(), function (item, pass) {
-                pass.mss.insertItem(item, true);
-            }, { mss: mss, update: true });
+            var id = $s.val();
+            if (id) {
+                mss.backend.callForItemById(id, function (item, pass) {
+                    pass.mss.insertItem(item, true);
+                }, { mss: mss, update: true });
+            }
             $s.val('');
         }
     };
