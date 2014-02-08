@@ -83,7 +83,7 @@
                     click: function (e) {
                         var $d = $(this);
                         var mss = $d.data('mss_obj');
-                        var item = { id: mss.allItems.length, label: $d.find('input').val() };
+                        var item = { id: mss.allItems.length + 1, label: $d.find('input').val() };
                         mss.insertItem(item);
                         mss.allItems.push(item);
                         mss.broadcastEvent('newItemInsert', { 'item': item });
@@ -104,23 +104,31 @@
 
     <script>
         $(function($) {
-            $('#my-featured-elem').multisortselect({ backend: programming_langugages, featured: function (mss) {
-                var featured = new Array;
-                for (var i = 0; i < programming_langugages.length; i++) {
-                    if (programming_langugages[i].label.match(/javascript/i)
-                        || programming_langugages[i].label.match(/perl/i)
-                        || programming_langugages[i].label.match(/php/i)
-                        || programming_langugages[i].label.match(/shell/i)
-                        || programming_langugages[i].label.match(/basic/i)
-                        || programming_langugages[i].label.match(/java/i)
-                    ) {
-                        featured.push(programming_langugages[i]);
+            $('#my-featured-elem').multisortselect({
+                backend: {
+                    call_all: programming_langugages,
+                    call_FeaturedItems: function (mss, method, handler, pass) {
+                        var featured = new Array;
+                        for (var i = 0; i < programming_langugages.length; i++) {
+                            if (programming_langugages[i].label.match(/javascript/i)
+                                || programming_langugages[i].label.match(/perl/i)
+                                || programming_langugages[i].label.match(/php/i)
+                                || programming_langugages[i].label.match(/shell/i)
+                                || programming_langugages[i].label.match(/basic/i)
+                                || programming_langugages[i].label.match(/java/i)
+                            ) {
+                                featured.push(programming_langugages[i]);
+                            }
+                        }
+                        handler(featured, pass);
                     }
-                }
-                return featured;
-            } });
+                },
+                show_featured: true
+            });
         }( jQuery ));
     </script>
+
+    <div style="margin-top: 20px;"></div>
 
 </body>
 </html>
