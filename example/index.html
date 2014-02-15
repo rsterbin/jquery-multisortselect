@@ -38,20 +38,20 @@
     <h2>Text entry Example</h2>
 
     <div id="my-text-example" class="example">
-        <p class="help">Type any human language and hit enter.  Drag to reorder, and click the x to remove a language.</p>
+        <p class="help">Type any human language and hit enter.  Drag to reorder, and click the x to remove a language.  Only five items will be allowed.</p>
         <input type="text" id="my-text-elem" name="languages" value='["French","Korean"]' />
     </div>
 
     <script>
         $(function($) {
-            $('#my-text-elem').multisortselect({ entry_type: 'text' });
+            $('#my-text-elem').multisortselect({ entry_type: 'text', max_items: 5 });
         }( jQuery ));
     </script>
 
     <h2>Show-All Example</h2>
 
     <div id="my-showall-example" class="example">
-        <p class="help">Start typing to select a map direction.  Drag to reorder, and click the x to remove a language.  Click "Show All" to see all available options.</p>
+        <p class="help">Start typing to select a map direction.  Drag to reorder, and click the x to remove a language.  Click "Show All" to see all available options.  Duplicates are okay.</p>
         <input type="text" id="my-showall-elem" name="languages" value="[4]" />
     </div>
 

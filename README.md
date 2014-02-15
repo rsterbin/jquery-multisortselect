@@ -98,6 +98,7 @@ Options
 | `format`           | function | `function (item) { return item.label; }` | how to display the element in the list                       |
 | `ui`               | boolean  | `true`                                   | whether to use jquery ui markup and classes                  |
 | `unique`           | boolean  | `true`                                   | whether to allow only one copy of any id                     |
+| `max_items`        | integer  | `-1`                                     | cannot add more items than this (`-1` for no limit)          |
 | `match`            | function | _none_                                   | use this to determine whether two ids are the same           |
 | `top_class`        | string   | _none_                                   | set this class on the wrapper div                            |
 | `validate`         | function | _none_                                   | when adding a text entry, check this first                   |

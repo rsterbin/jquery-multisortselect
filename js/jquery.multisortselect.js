@@ -36,6 +36,7 @@
         format: function (item) { return item.label; },
         ui: true,
         unique: true,
+        max_items: -1,
         show_all: false,
         cache_featured: true,
         allow_new: false
@@ -582,6 +583,12 @@
          * @param bool   update whether to update the value
          */
         insertItem: function(item, update) {
+            if (this.opts.max_items > -1) {
+                if (this.currentIds.length >= this.opts.max_items) {
+                    return;
+                }
+            }
+
             if (item.multisortselect_is_new_option) {
                 if (typeof this.opts.build_item == 'function') {
                     var built = this.opts.build_item(item.multisortselect_entry, this);
