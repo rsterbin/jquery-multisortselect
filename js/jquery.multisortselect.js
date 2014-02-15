@@ -764,7 +764,7 @@
                 this.$showall.slideDown();
                 this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
             }
-            this.$showall_button.refresh();
+            this.$showall_button.button('refresh');
         },
 
         // }}}
@@ -804,12 +804,18 @@
             }
             if (this.$featured.is(':visible')) {
                 this.$featured.slideUp();
-                this.$featured_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-s' });
+                if (this.opts.ui) {
+                    this.$featured_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-s' });
+                }
             } else {
                 this.$featured.slideDown();
-                this.$featured_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
+                if (this.opts.ui) {
+                    this.$featured_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
+                }
             }
-            this.$featured_button.refresh();
+            if (this.opts.ui) {
+                this.$featured_button.button('refresh');
+            }
         },
 
         // }}}
