@@ -122,6 +122,21 @@ Complex Backend Options
 | AllItems      | `call_AllItems`      | `all`      | Fetches all available items; value of `all` is always true                       |
 | FeaturedItems | `call_FeaturedItems` | `featured` | Fetches all available items; value of `all` is always true                       |
 
+Methods
+-------
+
+A few methods are callable using the plugin function, like so:
+`var results = $('#elem').multisortselect('function', argument);`.  The return
+value will be an array containing the function's return value for each matching
+element.
+
+| Method       | Arguments       | Returns                    | Description                                                                              |
+|:------------ |:--------------- |:-------------------------- |:---------------------------------------------------------------------------------------- |
+| `addItem`    | `item` (object) | boolean                    | adds an item to the bottom of the selected list                                          |
+| `cacheItem`  | `item` (object) | boolean                    | caches an item without adding it to the selected list                                    |
+| `removeItem` | `iid` (scalar)  | boolean                    | removes an item from the selected list                                                   |
+| `getNode`    | _none_          | jQuery set of DOM elements | returns the `<div class="multisortselect">` wrapping all the elements used by the plugin |
+
 Minimum Example
 ---------------
 

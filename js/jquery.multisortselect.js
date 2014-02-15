@@ -32,6 +32,7 @@
     MultiSortSelect.default_opts = {
         entry_type: 'autocomplete',
         backend: [],
+        use_cache: true,
         format: function (item) { return item.label; },
         ui: true,
         unique: true,
@@ -359,7 +360,7 @@
                 throw 'setAllItems() requires an object list';
             }
             this.allItems = new Array();
-            this.cache = {};
+            this.emptyCache = {};
             for (var i = 0; i < items.length; i++) {
                 this.cacheItem(items[i]);
                 this.allItems.push(items[i]);
@@ -502,6 +503,9 @@
          * @return bool  whether the item is cached
          */
         hasCachedItem: function(iid) {
+            if (!this.opts.use_cache) {
+                return false;
+            }
             if (typeof(this.cache) == 'string') {
                 return false;
             }
@@ -518,6 +522,9 @@
          * @return object the item, or false if not found
          */
         getCachedItem: function(iid) {
+            if (!this.opts.use_cache) {
+                return false;
+            }
             if (typeof(this.cache) == 'string') {
                 return false;
             }
@@ -533,13 +540,34 @@
         /**
          * Pushes an item into the cache
          *
-         * @param object item the item
+         * @param  object item the item
+         * @return bool   whether the item was cached
          */
         cacheItem: function(item) {
+            if (!this.opts.use_cache) {
+                return false;
+            }
             if (typeof(this.cache) == 'string') {
                 this.cache = {};
             }
             this.cache[item.id] = item;
+            return true;
+        },
+
+        // }}}
+        // {{{ emptyCache()
+
+        /**
+         * Empties the cache
+         *
+         * @return bool whether the cache was emptied
+         */
+        emptyCache: function() {
+            if (!this.opts.use_cache) {
+                return false;
+            }
+            this.cache = {};
+            return true;
         },
 
         // }}}
@@ -558,7 +586,7 @@
                 } else {
                     var built = this.buildItemFromEntry(item.multisortselect_entry);
                 }
-                // Don't insert it it didn't return an item
+                // Don't insert it if it didn't return an item
                 if (typeof built != 'object' || !built.id) {
                     return;
                 }
@@ -836,6 +864,62 @@
          */
         debug: function(obj) {
             MultiSortSelect.debug(obj);
+        },
+
+        // }}}
+        // {{{ public_addItem()
+
+        /**
+         * Adds an item to the selected list
+         *
+         * @param object item the item
+         */
+        public_addItem: function(item) {
+            this.insertItem(item, true);
+        },
+
+        // }}}
+        // {{{ public_cacheItem()
+
+        /**
+         * Caches an item (without adding it to the selected list)
+         *
+         * @param object item the item
+         */
+        public_cacheItem: function(item) {
+            this.cacheItem(item);
+        },
+
+        // }}}
+        // {{{ public_removeItem()
+
+        /**
+         * Removes an item from the selected list
+         *
+         * @param mixed iid the item's id
+         */
+        public_removeItem: function(iid) {
+            this.remove(iid);
+        },
+
+        // }}}
+        // {{{ public_getNode()
+
+        /**
+         * Gets the root element for this plugin
+         *
+         * The root element looks roughly like this:
+         *
+         * <div class="multisortselect" id="multisortselect_{{internal-id}}">
+         *  <ul class="multisortselect-list"></ul>
+         *  <input type="hidden" name="called_on_element" />
+         *  <div class="multisortselect-entry">{{some sort of entry element}}</div>
+         * </div>
+         *
+         * @return Element the root element
+         */
+        public_getNode: function() {
+            return this.$node;
         }
 
         // }}}
@@ -940,7 +1024,7 @@
         },
 
         // }}}
-        // {{{ getAutocompleteSource
+        // {{{ getAutocompleteSource()
 
         /**
          * Returns the proper source for the autocomplete plugin
@@ -1699,12 +1783,40 @@
      *
      * Filters out any non-text-input elements.
      *
-     * @param object opts any custom options
+     * @param  mixed opts if object, any custom options for invocation; if
+     *                    string, a public function
+     * @param  mixed arg  an argument for the public function indicated
+     * @return Array the return values of the public function, one per matching
+     *               element
      */
-    $.fn.multisortselect = function(opts) {
-        return this.filter('input[type=text]').each(function () {
-            var newobj = new MultiSortSelect($(this), opts);
+    $.fn.multisortselect = function(opts, arg) {
+        var $elems = this.filter('input[type=text]')
+        if (typeof(opts) == 'object') {
+            var retval = $elems;
+        } else {
+            var retval = new Array();
+        }
+
+        $elems.each(function () {
+            if (typeof(opts) == 'object') {
+                var newobj = new MultiSortSelect($(this), opts);
+                return;
+            }
+            if (typeof(opts) == 'string') {
+                var mss = MultiSortSelect.objectFromElem($(this));
+                if (opts == 'addItem') {
+                    retval.push(mss.public_addItem(arg));
+                } else if (opts == 'cacheItem') {
+                    retval.push(mss.public_cacheItem(arg));
+                } else if (opts == 'removeItem') {
+                    retval.push(mss.public_removeItem(arg));
+                } else if (opts == 'getNode') {
+                    retval.push(mss.public_getNode());
+                }
+            }
         });
+
+        return retval;
     };
 
     // }}}
