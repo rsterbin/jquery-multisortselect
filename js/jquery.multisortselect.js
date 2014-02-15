@@ -82,8 +82,10 @@
         e.preventDefault();
         var obj = MultiSortSelect.objectFromElem($(this));
         if (obj) {
-            var iid = $(this).closest('li').data('multisortselect_iid');
-            obj.remove(iid);
+            var $li = $(this).closest('li'),
+                iid = $li.data('multisortselect_iid'),
+                index = $li.data('multisortselect_index');
+            obj.remove(iid, index);
         }
     };
 
@@ -612,6 +614,7 @@
                     '<a href="#" class="multisortselect-remove" title="Remove">&#xd7;</a>' +
                 '</li>');
             $li.data('multisortselect_iid', iid);
+            $li.data('multisortselect_index', this.currentIds.length - 1);
             $li.find('.multisortselect-item').append(this.opts.format(item));
             if (this.opts.ui) {
                 $li.find('.multisortselect-move-icon')
@@ -672,20 +675,27 @@
         /**
          * Removes an item from the list
          *
-         * @param string iid the item id
+         * @param mixed iid   the item's id
+         * @param int   index the item's index
          */
-        remove: function(iid) {
-            var index = this.getCurrentIndex(iid);
-            if (index >= 0) {
+        remove: function(iid, index) {
+            if (this.opts.unique) {
+                var index = this.getCurrentIndex(iid);
+                if (index < 0) {
+                    this.$list.find('.multisortselect-list-item').each(function () {
+                        var $el = $(this);
+                        if ($el.data('multisortselect_iid') == iid) {
+                            $el.remove();
+                        }
+                    });
+                    return;
+                }
+            }
+            if (this.currentIds[index] == iid) {
                 this.currentIds.splice(index, 1);
                 this.$input.attr('value', JSON.stringify(this.currentIds));
+                $(this.$list.find('.multisortselect-list-item').get(index)).remove();
             }
-            this.$list.find('.multisortselect-list-item').each(function () {
-                var $el = $(this);
-                if ($el.data('multisortselect_iid') == iid) {
-                    $el.remove();
-                }
-            });
         },
 
         // }}}
@@ -696,8 +706,10 @@
          */
         reorderInput: function() {
             var newOrder = new Array();
-            this.$list.find('li').each(function () {
-                newOrder.push($(this).data('multisortselect_iid'));
+            this.$list.find('li').each(function (index) {
+                var $li = $(this);
+                $li.data('multisortselect_index', index);
+                newOrder.push($li.data('multisortselect_iid'));
             });
             this.currentIds = newOrder;
             this.$input.attr('value', JSON.stringify(newOrder));
@@ -896,10 +908,11 @@
         /**
          * Removes an item from the selected list
          *
-         * @param mixed iid the item's id
+         * @param mixed iid   the item's id
+         * @param int   index the item's index
          */
-        public_removeItem: function(iid) {
-            this.remove(iid);
+        public_removeItem: function(iid, index) {
+            this.remove(iid, index);
         },
 
         // }}}
