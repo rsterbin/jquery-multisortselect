@@ -37,10 +37,11 @@
         ui: true,
         unique: true,
         max_items: -1,
-        show_all: false,
         cache_featured: true,
-        allow_new: false
+        allow_new: false,
+        widgets: {}
     };
+    MultiSortSelect.registered_widgets = {};
 
     // }}}
     // {{{ Class-level methods
@@ -69,6 +70,52 @@
     MultiSortSelect.objectFromElem = function ($el) {
         var mid = $el.closest('.multisortselect').data('multisortselect_id');
         return MultiSortSelect.fetch(mid);
+    };
+
+    // }}}
+    // {{{ registerWidget()
+
+    /**
+     * Registers a widget
+     *
+     * @param  object widget the widget
+     * @return bool   whether the widget was accepted
+     */
+    MultiSortSelect.registerWidget = function (widget) {
+        if (typeof widget != 'object' || typeof widget.id != 'string' || typeof widget.init != 'function') {
+            return false;
+        }
+        MultiSortSelect.registered_widgets[widget.id] = widget;
+        return true;
+    };
+
+    // }}}
+    // {{{ widgetIsRegistered()
+
+    /**
+     * Returns whether a widget is registered
+     *
+     * @param  string pkey the widget id
+     * @return bool   whether the widget is registered
+     */
+    MultiSortSelect.widgetIsRegistered = function (pkey) {
+        return (typeof MultiSortSelect.registered_widgets[pkey] == 'object');
+    };
+
+    // }}}
+    // {{{ getRegisteredWidget()
+
+    /**
+     * Returns a registered widget
+     *
+     * @param  string pkey the widget id
+     * @return object the widget, or undefined if not found
+     */
+    MultiSortSelect.getRegisteredWidget = function (pkey) {
+        if (typeof MultiSortSelect.registered_widgets[pkey] == 'undefined') {
+            return false;
+        }
+        return MultiSortSelect.registered_widgets[pkey];
     };
 
     // }}}
@@ -103,39 +150,6 @@
         var obj = MultiSortSelect.objectFromElem($(this));
         if (obj) {
             obj.reorderInput();
-        }
-    };
-
-    // }}}
-    // {{{ eventShowAll()
-
-    /**
-     * Click event that toggles the show-all box
-     *
-     * @param Event e the event
-     */
-    MultiSortSelect.eventShowAll = function(e) {
-        e.preventDefault();
-        var obj = MultiSortSelect.objectFromElem($(this));
-        if (obj) {
-            obj.showAll();
-        }
-    };
-
-    // }}}
-    // {{{ eventShowAllAdd()
-
-    /**
-     * Click event that adds an item from the show-all box
-     *
-     * @param Event e the event
-     */
-    MultiSortSelect.eventShowAllAdd = function(e) {
-        e.preventDefault();
-        var obj = MultiSortSelect.objectFromElem($(this));
-        if (obj) {
-            var iid = $(this).closest('li').attr('rel');
-            obj.insertItemById(iid, true);
         }
     };
 
@@ -201,17 +215,14 @@
         cache: '',
         currentIds: '',
         allItems: '',
-        fetchedAll: false,
-        builtShowAll: false,
         featuredItems: '',
         fetchedFeatured: false,
         builtFeatured: false,
         $input: '',
         $node: '',
         $list: '',
-        $showall_button: '',
-        $showall: '',
         $entry: '',
+        widgets: '',
 
         // }}}
         // {{{ init()
@@ -300,21 +311,6 @@
             this.$entry = this.$node.find('.multisortselect-entry');
             this.$entry.append(this.entryObj.build());
 
-            // Add show-all button, if requested
-            if (this.opts.show_all) {
-                var button = '<a href="#" class="multisortselect-showall_button multisortselect-button">Show All</a>';
-                this.$node.append(button);
-                this.$showall_button = this.$node.find('.multisortselect-showall_button');
-                this.$showall_button.click(MultiSortSelect.eventShowAll);
-                if (this.opts.ui) {
-                    this.$showall_button.button({ icons: { primary: 'ui-icon-circle-triangle-s' } });
-                }
-                var showall = '<ul class="multisortselect-showall multisortselect-chooser"></ul>';
-                this.$node.append(showall);
-                this.$showall = this.$node.find('.multisortselect-showall');
-                this.$showall.hide();
-            }
-
             // Add featured button, if requested
             if (this.opts.show_featured) {
                 var button = '<a href="#" class="multisortselect-featured_button multisortselect-button">Featured</a>';
@@ -347,6 +343,17 @@
                     this.backend.callForDefaults(iids);
                 }
             }
+
+            // Initialize any widgets
+            this.widgets = {};
+            for (var pkey in this.opts.widgets) {
+                var popts = this.opts.widgets[pkey];
+                if (MultiSortSelect.widgetIsRegistered(pkey)) {
+                    this.widgets[pkey] = MultiSortSelect.getRegisteredWidget(pkey);
+                    this.widgets[pkey].init(this, popts);
+                }
+            }
+
         },
 
         // }}}
@@ -723,48 +730,32 @@
         },
 
         // }}}
-        // {{{ showAll()
+        // {{{ hasWidget()
 
         /**
-         * Shows all the available options
+         * Returns whether we have a widget
+         *
+         * @param  string pkey the widget id
+         * @return bool   whether the widget is set up
          */
-        showAll: function() {
-            if (!this.fetchedAll) {
-                var handler = function (items, pass) {
-                    pass.mss.fetchedAll = true;
-                    pass.mss.showAll();
-                };
-                var pass = { mss: this };
-                this.backend.callForAllItems(handler, pass);
-                return;
+        hasWidget: function(pkey) {
+            return (typeof this.widgets[pkey] != 'undefined');
+        },
+
+        // }}}
+        // {{{ getWidget()
+
+        /**
+         * Returns a widget
+         *
+         * @param  string pkey the widget id
+         * @return object the item, or false if not found
+         */
+        getWidget: function(pkey) {
+            if (typeof this.widgets[pkey] != 'undefined') {
+                return this.widgets[pkey];
             }
-            if (!this.builtShowAll) {
-                for (var i = 0; i < this.allItems.length; i++) {
-                    var item = this.allItems[i];
-                    var $li = $('<li class="multisortselect-chooser-item">' +
-                            '<span class="multisortselect-add-icon"></span>' +
-                            '<div class="multisortselect-item"></div>' +
-                        '</li>');
-                    $li.attr('rel', item.id);
-                    $li.find('.multisortselect-item').append(this.opts.format(item));
-                    if (this.opts.ui) {
-                        $li.find('.multisortselect-add-icon')
-                            .addClass('ui-icon')
-                            .addClass('ui-icon-plus');
-                    }
-                    $li.click(MultiSortSelect.eventShowAllAdd);
-                    this.$showall.append($li);
-                }
-                this.builtShowAll = true;
-            }
-            if (this.$showall.is(':visible')) {
-                this.$showall.slideUp();
-                this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-s' });
-            } else {
-                this.$showall.slideDown();
-                this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
-            }
-            this.$showall_button.button('refresh');
+            return false;
         },
 
         // }}}
@@ -946,6 +937,25 @@
          */
         public_getNode: function() {
             return this.$node;
+        },
+
+        // }}}
+        // {{{ public_option()
+
+        /**
+         * Gets/sets an option
+         *
+         * @param  mixed name  the option name
+         * @param  mixed value [optional] the option value, if we're setting it
+         * @return mixed the option value, if we're getting it
+         */
+        public_option: function(name) {
+            if (arguments.length > 1) {
+                var value = arguments[1];
+                this.opts[name] = value;
+            } else {
+                return this.opts[name];
+            }
         }
 
         // }}}
@@ -965,8 +975,8 @@
      * @param MultiSortSelect mss   the associated MultiSortSelect object
      * @param mixed           setup the info necessary to set up
      */
-    MSS_Backend = function($el, setup) {
-        this.init($el, setup);
+    MSS_Backend = function(mss, setup) {
+        this.init(mss, setup);
     }
 
     // }}}
@@ -1437,8 +1447,8 @@
      * @param MultiSortSelect mss  the associated MultiSortSelect object
      * @param object          opts any custom options
      */
-    MSS_Entry_Autocomplete = function($el, opts) {
-        this.init($el, opts);
+    MSS_Entry_Autocomplete = function(mss, opts) {
+        this.init(mss, opts);
     }
 
     // }}}
@@ -1575,8 +1585,8 @@
      * @param MultiSortSelect mss  the associated MultiSortSelect object
      * @param object          opts any custom options
      */
-    MSS_Entry_Select = function($el, opts) {
-        this.init($el, opts);
+    MSS_Entry_Select = function(mss, opts) {
+        this.init(mss, opts);
     }
 
     // }}}
@@ -1715,8 +1725,8 @@
      * @param MultiSortSelect mss  the associated MultiSortSelect object
      * @param object          opts any custom options
      */
-    MSS_Entry_Text = function($el, opts) {
-        this.init($el, opts);
+    MSS_Entry_Text = function(mss, opts) {
+        this.init(mss, opts);
     }
 
     // }}}
@@ -1800,6 +1810,184 @@
     });
 
     // }}}
+
+    // }}}
+    // {{{ MSS_Widget_ShowAll class
+
+    // {{{ Constructor
+
+    /**
+     * Initializes a new object
+     */
+    MSS_Widget_ShowAll = function() {
+        this.id = MSS_Widget_ShowAll.id;
+    };
+
+    // }}}
+    // {{{ Class-level properties
+
+    MSS_Widget_ShowAll.id = 'show_all';
+    MSS_Widget_ShowAll.default_opts = {
+        button_text: 'Show All'
+    };
+
+    // }}}
+    // {{{ Class-level methods
+
+    // {{{ eventShowAll()
+
+    /**
+     * Click event that toggles the show-all box
+     *
+     * @param Event e the event
+     */
+    MSS_Widget_ShowAll.eventShowAll = function(e) {
+        e.preventDefault();
+        var obj = MultiSortSelect.objectFromElem($(this));
+        if (obj) {
+            obj.getWidget(MSS_Widget_ShowAll.id).toggle();
+        }
+    };
+
+    // }}}
+    // {{{ eventShowAllAdd()
+
+    /**
+     * Click event that adds an item from the show-all box
+     *
+     * @param Event e the event
+     */
+    MSS_Widget_ShowAll.eventShowAllAdd = function(e) {
+        e.preventDefault();
+        var obj = MultiSortSelect.objectFromElem($(this));
+        if (obj) {
+            var iid = $(this).closest('li').attr('rel');
+            obj.getWidget(MSS_Widget_ShowAll.id).addItem(iid);
+        }
+    };
+
+    // }}}
+
+    // }}}
+    // {{{ Prototype
+
+    $.extend(MSS_Widget_ShowAll.prototype, {
+
+        // {{{ Object variables
+
+        mss: null,
+        fetchedAll: false,
+        builtShowAll: false,
+        opts: {},
+        $showall_button: '',
+        $showall: '',
+
+        // }}}
+        // {{{ init()
+
+        /**
+         * Init method, run only once, on launch
+         *
+         * @param MultiSortSelect mss  the associated MultiSortSelect object
+         * @param object          opts any custom options
+         */
+        init: function(mss, opts) {
+            this.mss = mss;
+            this.opts = $.extend({}, MSS_Widget_ShowAll.default_opts, opts);
+            if (typeof this.opts.format == 'undefined') {
+                this.opts.format = this.mss.public_option('format');
+            }
+            if (typeof this.opts.ui == 'undefined') {
+                this.opts.ui = this.mss.public_option('ui');
+            }
+
+            var $node = this.mss.public_getNode();
+            var button = '<a href="#" class="multisortselect-showall_button multisortselect-button">' + this.opts.button_text + '</a>';
+            $node.append(button);
+            this.$showall_button = $node.find('.multisortselect-showall_button');
+            this.$showall_button.click(MSS_Widget_ShowAll.eventShowAll);
+            if (this.opts.ui) {
+                this.$showall_button.button({ icons: { primary: 'ui-icon-circle-triangle-s' } });
+            }
+            var showall = '<ul class="multisortselect-showall multisortselect-chooser"></ul>';
+            $node.append(showall);
+            this.$showall = $node.find('.multisortselect-showall');
+            this.$showall.hide();
+        },
+
+        // }}}
+        // {{{ toggle()
+
+        /**
+         * Shows all the available options
+         */
+        toggle: function() {
+            if (!this.fetchedAll) {
+                var handler = function (items, pass) {
+                    pass.widget.fetchedAll = true;
+                    pass.widget.toggle();
+                };
+                var pass = { widget: this };
+                this.mss.backend.callForAllItems(handler, pass);
+                return;
+            }
+            if (!this.builtShowAll) {
+                for (var i = 0; i < this.mss.allItems.length; i++) {
+                    var item = this.mss.allItems[i];
+                    var $li = $('<li class="multisortselect-chooser-item">' +
+                            '<span class="multisortselect-add-icon"></span>' +
+                            '<div class="multisortselect-item"></div>' +
+                        '</li>');
+                    $li.attr('rel', item.id);
+                    $li.find('.multisortselect-item').append(this.opts.format(item));
+                    if (this.opts.ui) {
+                        $li.find('.multisortselect-add-icon')
+                            .addClass('ui-icon')
+                            .addClass('ui-icon-plus');
+                    }
+                    $li.click(MSS_Widget_ShowAll.eventShowAllAdd);
+                    this.$showall.append($li);
+                }
+                this.builtShowAll = true;
+            }
+            if (this.$showall.is(':visible')) {
+                this.$showall.slideUp();
+                if (this.opts.ui) {
+                    this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-s' });
+                }
+            } else {
+                this.$showall.slideDown();
+                if (this.opts.ui) {
+                    this.$showall_button.button('option', 'icons', { primary: 'ui-icon-circle-triangle-n' });
+                }
+            }
+            if (this.opts.ui) {
+                this.$showall_button.button('refresh');
+            }
+        },
+
+        // }}}
+        // {{{ addItem()
+
+        /**
+         * Adds an item to the selected list
+         *
+         * @param mixed iid the item id
+         */
+        addItem: function(iid) {
+            this.mss.insertItemById(iid, true);
+        }
+
+        // }}}
+
+    });
+
+    // }}}
+
+    // }}}
+    // {{{ Register built-in widgets
+
+    MultiSortSelect.registerWidget(new MSS_Widget_ShowAll);
 
     // }}}
     // {{{ Add to jQuery
