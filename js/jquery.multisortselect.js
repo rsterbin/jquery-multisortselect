@@ -27,8 +27,27 @@
     // }}}
     // {{{ Class-level properties
 
-    MultiSortSelect.registry = new Array(); // Index each new object (for use in css ids)
+    // {{{ registry
+
+    /**
+     * Index each new object (for use in css ids)
+     */
+    MultiSortSelect.registry = new Array();
+
+    // }}}
+    // {{{ new_id
+
+    /**
+     * If the item id is this, it's a placeholder
+     */
     MultiSortSelect.new_id = '_multisortselect_new';
+
+    // }}}
+    // {{{ default_opts
+
+    /**
+     * The default options
+     */
     MultiSortSelect.default_opts = {
         entry_type: 'autocomplete',
         backend: [],
@@ -41,7 +60,512 @@
         allow_new: false,
         widgets: {}
     };
+
+    // }}}
+    // {{{ registered_widgets
+
+    /**
+     * The widgets registered and available to the plugin
+     */
     MultiSortSelect.registered_widgets = {};
+
+    // }}}
+    // {{{ backend_call_types
+
+    /**
+     * The backend call definitions
+     */
+    MultiSortSelect.backend_call_types = {
+
+        // {{{ item_by_id
+
+        /**
+         * Calls for an item using its id
+         */
+        item_by_id: {
+
+            // {{{ accepts
+
+            /**
+             * Contents of params
+             */
+            accepts: {
+                iid: 'required',
+                handler: 'optional',
+                pass: 'optional'
+            },
+
+            // }}}
+            // {{{ returns
+
+            /**
+             * Contents of return
+             */
+            returns: {
+                item: 'required'
+            },
+
+            // }}}
+            // {{{ before()
+
+            /**
+             * Checks before the call to determine whether we need to proceed
+             *
+             * @param  MSS_Backend backend   the mss backend object
+             * @param  object      params    the params, as described in 'accepts'
+             * @param  object      call_info the call info (this object)
+             * @return bool        whether to proceed
+             */
+            before: function (backend, params, call_info) {
+
+                // New item?  Call for that instead.
+                if (params.iid == MultiSortSelect.new_id) {
+                    var newparams = { entry: '' };
+                    if (typeof params.handler != 'undefined') {
+                        newparams.handler = params.handler;
+                    }
+                    if (typeof params.pass != 'undefined') {
+                        newparams.pass = params.pass;
+                    }
+                    backend.makeCall('new_item', newparams);
+                    return false;
+                }
+
+                // Do we already have it?
+                var cached = backend.mss.public_getCachedItem(params.iid);
+                if (cached) {
+                    if (typeof params.handler == 'function') {
+                        params.handler(cached, params.pass);
+                    }
+                    return false;
+                }
+
+                return true;
+            },
+
+            // }}}
+            // {{{ ajax
+
+            /**
+             * Options for the ajax call
+             */
+            ajax: {
+                method: 'get',
+                vars: { defaults: { key: 'iid', transform: 'json_array' } },
+                ret: { item: { transform: 'first_item' } }
+            },
+
+            // }}}
+            // {{{ from_array()
+
+            /**
+             * Pulls the necessary info from a backend array
+             *
+             * @param  Array       arr     the array
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @return object      the return values, as described in 'returns'
+             */
+            from_array: function (arr, backend, params) {
+                var item = null;
+                for (var i = 0; i < arr.length; i++) {
+                    if (arr[i].id == iid) {
+                        item = arr[i];
+                        break;
+                    }
+                }
+                return { 'item': item };
+            },
+
+            // }}}
+            // {{{ success()
+
+            /**
+             * Work to do upon a successful return
+             *
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @param  object      retvals the array
+             */
+            success: function (backend, params, retvals) {
+                backend.mss.public_cacheItem(retvals.item);
+                if (typeof params.handler == 'function') {
+                    params.handler(retvals.item, params.pass);
+                }
+            }
+
+            // }}}
+
+        },
+
+        // }}}
+        // {{{ new_item
+
+        /**
+         * Calls out for a new item, possibly given some text
+         */
+        new_item: {
+
+            // {{{ accepts
+
+            /**
+             * Contents of params
+             */
+            accepts: {
+                entry: 'required',
+                handler: 'optional',
+                pass: 'optional'
+            },
+
+            // }}}
+            // {{{ returns
+
+            /**
+             * Contents of return
+             */
+            returns: {
+                item: 'required'
+            },
+
+            // }}}
+            // {{{ ajax
+
+            /**
+             * Options for the ajax call
+             */
+            ajax: {
+                method: 'post',
+                vars: { new: { key: 'entry' } },
+                ret: { item: {} }
+            },
+
+            // }}}
+            // {{{ from_array()
+
+            /**
+             * Pulls the necessary info from a backend array
+             *
+             * @param  Array       arr     the array
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @return object      the return values, as described in 'returns'
+             */
+            from_array: function (arr, backend, params) {
+                var item = backend.mss.public_buildItem(params.entry);
+                return { 'item': item };
+            },
+
+            // }}}
+            // {{{ success()
+
+            /**
+             * Work to do upon a successful return
+             *
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @param  object      retvals the array
+             */
+            success: function (backend, params, retvals) {
+                backend.mss.public_addNewItem(retvals.item);
+                if (typeof params.handler == 'function') {
+                    params.handler(retvals.item, params.pass);
+                }
+            }
+
+            // }}}
+
+        },
+
+        // }}}
+        // {{{ defaults
+
+        /**
+         * Calls out for a set of items by their ids
+         */
+        defaults: {
+
+            // {{{ accepts
+
+            /**
+             * Contents of params
+             */
+            accepts: {
+                entry: 'defaults',
+                handler: 'optional',
+                pass: 'optional'
+            },
+
+            // }}}
+            // {{{ returns
+
+            /**
+             * Contents of return
+             */
+            returns: {
+                items: 'required'
+            },
+
+            // }}}
+            // {{{ before()
+
+            /**
+             * Checks before the call to determine whether we need to proceed
+             *
+             * @param  MSS_Backend backend   the mss backend object
+             * @param  object      params    the params, as described in 'accepts'
+             * @param  object      call_info the call info (this object)
+             * @return bool        whether to proceed
+             */
+            before: function (backend, params, call_info) {
+                var found = new Array;
+                for (var i = 0; i < params.defaults.length; i++) {
+                    var item = backend.mss.public_getCachedItem(params.defaults[i]);
+                    if (item) {
+                        found.push(item);
+                    }
+                }
+                if (found.length == params.defaults.length) {
+                    call_info.success(backend, params, { items: found });
+                    return false;
+                }
+                return true;
+            },
+
+            // }}}
+            // {{{ ajax
+
+            /**
+             * Options for the ajax call
+             */
+            ajax: {
+                method: 'get',
+                vars: { defaults: { key: 'defaults' } },
+                ret: { items: {} }
+            },
+
+            // }}}
+            // {{{ from_array()
+
+            /**
+             * Pulls the necessary info from a backend array
+             *
+             * @param  Array       arr     the array
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @return object      the return values, as described in 'returns'
+             */
+            from_array: function (arr, backend, params) {
+                var items = new Array;
+                for (var j = 0; j < params.defaults.length; j++) {
+                    var item = backend.mss.public_getCachedItem(params.defaults[j]);
+                    if (typeof item != 'object') {
+                        var item = backend.mss.public_buildItem(params.defaults[j]);
+                    }
+                    items.push(item);
+                }
+                return { 'items': items };
+            },
+
+            // }}}
+            // {{{ success()
+
+            /**
+             * Work to do upon a successful return
+             *
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @param  object      retvals the array
+             */
+            success: function (backend, params, retvals) {
+                for (var i = 0; i < retvals.items.length; i++) {
+                    backend.mss.cacheItem(retvals.items[i]);
+                    backend.mss.insertItem(retvals.items[i], false);
+                }
+                if (typeof params.handler == 'function') {
+                    params.handler(retvals.items, params.pass);
+                }
+            }
+
+            // }}}
+
+        },
+
+        // }}}
+        // {{{ all_items
+
+        /**
+         * Calls out for a list of all the items
+         */
+        all_items: {
+
+            // {{{ accepts
+
+            /**
+             * Contents of params
+             */
+            accepts: {
+                handler: 'optional',
+                pass: 'optional'
+            },
+
+            // }}}
+            // {{{ returns
+
+            /**
+             * Contents of return
+             */
+            returns: {
+                items: 'required'
+            },
+
+            // }}}
+            // {{{ before()
+
+            /**
+             * Checks before the call to determine whether we need to proceed
+             *
+             * @param  MSS_Backend backend   the mss backend object
+             * @param  object      params    the params, as described in 'accepts'
+             * @param  object      call_info the call info (this object)
+             * @return bool        whether to proceed
+             */
+            before: function (backend, params, call_info) {
+                if (typeof backend.mss.allItems != 'string') {
+                    call_info.success(backend, params, { items: backend.mss.allItems });
+                    return false;
+                }
+                return true;
+            },
+
+            // }}}
+            // {{{ ajax
+
+            /**
+             * Options for the ajax call
+             */
+            ajax: {
+                method: 'get',
+                vars: {},
+                ret: { items: {} }
+            },
+
+            // }}}
+            // {{{ from_array()
+
+            /**
+             * Pulls the necessary info from a backend array
+             *
+             * @param  Array       arr     the array
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @return object      the return values, as described in 'returns'
+             */
+            from_array: function (arr, backend, params) {
+                return { 'items': arr };
+            },
+
+            // }}}
+            // {{{ success()
+
+            /**
+             * Work to do upon a successful return
+             *
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @param  object      retvals the array
+             */
+            success: function (backend, params, retvals) {
+                backend.mss.setAllItems(retvals.items);
+                if (typeof params.handler == 'function') {
+                    params.handler(retvals.items, params.pass);
+                }
+            }
+
+            // }}}
+
+        },
+
+        // }}}
+        // {{{ featured
+
+        /**
+         * Calls out for a list of featured items
+         */
+        featured: {
+
+            // {{{ accepts
+
+            /**
+             * Contents of params
+             */
+            accepts: {
+                handler: 'optional',
+                pass: 'optional'
+            },
+
+            // }}}
+            // {{{ returns
+
+            /**
+             * Contents of return
+             */
+            returns: {
+                items: 'required'
+            },
+
+            // }}}
+            // {{{ ajax
+
+            /**
+             * Options for the ajax call
+             */
+            ajax: {
+                method: 'get',
+                vars: { featured: { hardcoded: true } },
+                ret: { items: {} }
+            },
+
+            // }}}
+            // {{{ from_array()
+
+            /**
+             * Pulls the necessary info from a backend array
+             *
+             * @param  Array       arr     the array
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @return object      the return values, as described in 'returns'
+             */
+            from_array: function (arr, backend, params) {
+                return { 'items': arr };
+            },
+
+            // }}}
+            // {{{ success()
+
+            /**
+             * Work to do upon a successful return
+             *
+             * @param  MSS_Backend backend the mss backend object
+             * @param  object      params  the params, as described in 'accepts'
+             * @param  object      retvals the array
+             */
+            success: function (backend, params, retvals) {
+                backend.mss.setFeaturedItems(retvals.items);
+                if (typeof params.handler == 'function') {
+                    params.handler(retvals.items, params.pass);
+                }
+            }
+
+            // }}}
+
+        }
+
+        // }}}
+
+    };
+
+    // }}}
 
     // }}}
     // {{{ Class-level methods
@@ -262,10 +786,13 @@
             } else {
                 throw 'Backend not supported';
             }
+            for (var call_name in MultiSortSelect.backend_call_types) {
+                this.backend.registerCallType(call_name, MultiSortSelect.backend_call_types[call_name]);
+            }
 
             // Prep the item list, if we already have one
             if (this.backend.hasAllItems()) {
-                this.backend.callForAllItems();
+                this.backend.makeCall('all_items');
             }
 
             // Initialize the node
@@ -340,7 +867,7 @@
                     this.debug(err);
                 }
                 if (iids) {
-                    this.backend.callForDefaults(iids);
+                    this.backend.makeCall('defaults', { defaults: iids });
                 }
             }
 
@@ -460,22 +987,6 @@
                 multisortselect_is_new_option: true,
                 multisortselect_entry: entry
             };
-        },
-
-        // }}}
-        // {{{ buildItemFromId()
-
-        /**
-         * Builds an item from an id
-         *
-         * @param  mixed  id the id
-         * @return object an object usable here
-         */
-        buildItemFromId: function(id) {
-            if (typeof this.opts.build_item == 'function') {
-                return this.opts.build_item(id, this);
-            }
-            return { id: id, label: id, value: id };
         },
 
         // }}}
@@ -680,7 +1191,7 @@
                 pass.mss.insertItem(item, pass.update);
             };
             var pass = { mss: this, update: update };
-            this.backend.callForItemById(iid, handler, pass);
+            this.backend.makeCall('item_by_id', { iid: iid });
         },
 
         // }}}
@@ -769,9 +1280,12 @@
                 return;
             }
             if (!this.opts.cache_featured || !this.fetchedFeatured) {
-                this.backend.callForFeaturedItems(function(items, pass) {
-                    pass.mss.showFeatured();
-                }, { mss: this });
+                this.backend.makeCall('featured', {
+                    handler: function (items, pass) {
+                        pass.mss.showFeatured();
+                    },
+                    pass: { mss: this }
+                });
                 return;
             }
             if (!this.opts.cache_featured || !this.builtFeatured) {
@@ -895,15 +1409,15 @@
         },
 
         // }}}
-        // {{{ public_cacheItem()
+        // {{{ public_addNewItem()
 
         /**
-         * Caches an item (without adding it to the selected list)
+         * Adds a new item to the selected list that didn't previously exist
          *
          * @param object item the item
          */
-        public_cacheItem: function(item) {
-            this.cacheItem(item);
+        public_addNewItem: function(item) {
+            this.insertNewItem(item);
         },
 
         // }}}
@@ -917,6 +1431,43 @@
          */
         public_removeItem: function(iid, index) {
             this.remove(iid, index);
+        },
+
+        // }}}
+        // {{{ public_cacheItem()
+
+        /**
+         * Caches an item (without adding it to the selected list)
+         *
+         * @param object item the item
+         */
+        public_cacheItem: function(item) {
+            this.cacheItem(item);
+        },
+
+        // }}}
+        // {{{ public_getCachedItem()
+
+        /**
+         * Pulls an item from the cache, by id
+         *
+         * @param  mixed  iid the item id
+         * @return object the item, or false if not found
+         */
+        public_getCachedItem: function(iid) {
+            return this.getCachedItem(iid);
+        },
+
+        // }}}
+        // {{{ public_buildItem()
+
+        /**
+         * Builds an item (without adding it to the selected list)
+         *
+         * @param mixed entry [optional] some sort of text entry
+         */
+        public_buildItem: function(entry) {
+            return this.buildItemFromEntry(entry);
         },
 
         // }}}
@@ -980,6 +1531,21 @@
     }
 
     // }}}
+    // {{{ Class-level properties
+
+    MSS_Backend.default_call_opts = {
+        accepts: {},
+        returns: {},
+        ajax: {
+            method: 'GET',
+            vars: {},
+            ret: {}
+        },
+        from_array: function (arr, backend, params) { return {}; },
+        success: function (backend, params, retvals) {}
+    };
+
+    // }}}
     // {{{ Prototype
 
     $.extend(MSS_Backend.prototype, {
@@ -988,6 +1554,7 @@
 
         mss: null,
         opts: {},
+        callTypes: '',
 
         // }}}
         // {{{ init()
@@ -1001,6 +1568,53 @@
         init: function(mss, opts) {
             this.mss = mss;
             this.opts = $.extend({}, MSS_Backend.default_opts, opts);
+            this.callTypes = {};
+        },
+
+        // }}}
+        // {{{ registerCallType()
+
+        /**
+         * Registers a new call type
+         *
+         * @param string name the call name
+         * @param object info the call info
+         */
+        registerCallType: function(name, info) {
+            var call_info = $.extend({}, MSS_Backend.default_call_opts, info);
+            this.callTypes[name] = call_info;
+        },
+
+        // }}}
+        // {{{ callTypeIsRegistered()
+
+        /**
+         * Returns whether a call type is registered
+         *
+         * @param  string name the call name
+         * @return bool   whether it's registered
+         */
+        callTypeIsRegistered: function(name) {
+            if (typeof this.callTypes[name] == 'undefined') {
+                return false;
+            }
+            return true;
+        },
+
+        // }}}
+        // {{{ getCallInfo()
+
+        /**
+         * Returns the info for a call type
+         *
+         * @param  string name the call name
+         * @return object the info, or false if not found
+         */
+        getCallInfo: function(name) {
+            if (typeof this.callTypes[name] == 'undefined') {
+                return false;
+            }
+            return this.callTypes[name];
         },
 
         // }}}
@@ -1076,359 +1690,100 @@
         },
 
         // }}}
-        // {{{ callForItemById()
+        // {{{ makeCall()
 
         /**
-         * Calls out for an item by its id
+         * Makes a call
          *
-         * @param  mixed     iid     the item id
-         * @param  function  handler a function that handles the item (args:
-         *                           item, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
+         * @param  string call_type the call type
+         * @param  object params    the call parameters
+         * @return bool   whether the call was successful
          */
-        callForItemById: function(iid, handler, pass) {
-            var METHOD = 'ItemById';
+        makeCall: function(call_type, params) {
+            if (!this.callTypeIsRegistered(call_type)) {
+                return false;
+            }
+            if (typeof params == 'undefined') {
+                params = {};
+            }
+            var call_info = this.getCallInfo(call_type);
 
-            // New item?  Call for that.
-            if (iid == MultiSortSelect.new_id) {
-                this.callForNewItem('', handler, pass);
-                return;
+            // Handle preprocessing
+            var proceed = true;
+            if (typeof call_info.before == 'function') {
+                proceed = call_info.before(this, params, call_info);
+            }
+            if (!proceed) {
+                return false;
             }
 
-            // Do we already have it?
-            var cached = this.mss.getCachedItem(iid);
-            if (cached) {
-                if (typeof handler == 'function') {
-                    handler(cached, pass);
-                }
-                return;
-            }
-
-            // Call for it
-            var caller = this.findCaller(METHOD);
+            // Find the caller
+            var caller = this.findCaller(call_type);
             var caller_type = this.getCallerType(caller);
 
             // Ajax call
             if (caller_type == 'ajax') {
-                var arr = new Array;
-                arr.push(iid);
+
+                // Generate pass data
+                var pass_data = {};
+                for (var k in call_info.ajax.vars) {
+                    var vopts = call_info.ajax.vars[k];
+                    var v = null;
+                    if (typeof vopts.key == 'string') {
+                        v = params[vopts.key];
+                    } else if (typeof vopts.hardcoded != 'undefined') {
+                        v = vopts.hardcoded;
+                    }
+                    if (vopts.transform == 'json_array') {
+                        var arr = new Array;
+                        arr.push(v);
+                        v = JSON.stringify(arr);
+                    }
+                    pass_data[k] = v;
+                }
+
+                // Ajax call
                 $.ajax({
-                    'type': 'GET',
+                    'type': call_info.method,
                     'url': caller,
-                    'data': { 'defaults': JSON.stringify(arr) },
+                    'data': pass_data,
                     'dataType': 'json',
-                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
+                    'context': { 'backend': this, 'call_info': call_info, 'params': params },
                     'success': function (data) {
-                        for (var i = 0; i < data.length; i++) {
-                            this.mss.cacheItem(data[i]);
-                            if (typeof this.handler == 'function') {
-                                this.handler(data[i], this.pass);
+                        var retvals = {};
+                        var rinfo = this.call_info.ajax.ret;
+                        for (var k in rinfo) {
+                            if (typeof rinfo[k].key == 'undefined') {
+                                var v = data;
+                            } else {
+                                var v = data[rinfo[k].key];
                             }
+                            if (rinfo[k].transform == 'first_item' && typeof v == 'object' && v instanceof Array) {
+                                v = v[0];
+                            }
+                            retvals[k] = v;
                         }
+                        this.call_info.success(this.backend, this.params, retvals);
                     },
                     'error': this.handleAjaxError
                 });
 
             // Function call
             } else if (caller_type == 'function') {
-                var wrap_handler = function(item, wrap_pass) {
-                    wrap_pass.mss.cacheItem(item);
-                    if (typeof wrap_pass.handler == 'function') {
-                        wrap_pass.handler(item, wrap_pass.pass);
-                    }
+                var callback = function(retvals, pass_vars) {
+                    pass_vars.call_info.success(pass_vars.backend, pass_vars.params, retvals);
                 };
-                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
-                caller(this.mss, METHOD, wrap_handler, wrap_pass, iid);
+                var callback_vars = { 'backend': this, 'call_info': call_info, 'params': params };
+                caller(params, call_type, callback, callback_vars, this.mss);
 
             // Pull from array
             } else if (caller_type == 'array') {
-                var item = null;
-                for (var i = 0; i < caller.length; i++) {
-                    if (caller[i].id == iid) {
-                        item = caller[i];
-                        break;
-                    }
-                }
-                if (typeof item == 'object' && typeof handler == 'function') {
-                    handler(item, pass);
-                }
+                var retvals = call_info.from_array(caller, this, params);
+                call_info.success(this, params, retvals);
             }
+
+            return true;
         },
-
-        // }}}
-        // {{{ callForNewItem()
-
-        /**
-         * Calls out for a new item, possibly given some text
-         *
-         * @param  string    entry   something from which to build the item
-         * @param  function  handler a function that handles the item (args:
-         *                           item, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForNewItem: function(entry, handler, pass) {
-            var METHOD = 'NewItem';
-
-            // Call for it
-            var caller = this.findCaller(METHOD);
-            var caller_type = this.getCallerType(caller);
-
-            // Ajax call
-            if (caller_type == 'ajax') {
-                var arr = new Array;
-                arr.push(iid);
-                $.ajax({
-                    'type': 'POST',
-                    'url': caller,
-                    'data': { 'new': entry },
-                    'dataType': 'json',
-                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
-                    'success': function (data) {
-                        this.mss.insertNewItem(data);
-                        if (typeof this.handler == 'function') {
-                            this.handler(data, this.pass);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-
-            // Function call
-            } else if (caller_type == 'function') {
-                var wrap_handler = function(item, wrap_pass) {
-                    wrap_pass.mss.insertNewItem(item);
-                    if (typeof wrap_pass.handler == 'function') {
-                        wrap_pass.handler(item, wrap_pass.pass);
-                    }
-                };
-                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
-                caller(this.mss, METHOD, wrap_handler, wrap_pass, entry);
-
-            // Array backend: run through mss build
-            } else if (caller_type == 'array') {
-                var item = this.mss.buildItemFromEntry(entry);
-                if (typeof item == 'object' && typeof handler == 'function') {
-                    handler(item, pass);
-                }
-            }
-
-        },
-
-        // }}}
-        // {{{ callForDefaults()
-
-        /**
-         * Calls out for a set of items by their ids
-         *
-         * @param  array     iids    the item ids
-         * @param  function  handler a function that handles the items (args:
-         *                           items, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForDefaults: function(defaults, handler, pass) {
-            var METHOD = 'Defaults';
-
-            // Do we already have them?
-            var cached = new Array;
-            for (var i = 0; i < defaults.length; i++) {
-                var item = this.mss.getCachedItem(defaults[i]);
-                if (item) {
-                    cached.push(item);
-                }
-            }
-            if (cached.length == defaults.length) {
-                for (var i = 0; i < cached.length; i++) {
-                    this.mss.cacheItem(cached[i]);
-                    this.mss.insertItem(cached[i], false);
-                }
-                if (typeof handler == 'function') {
-                    handler(cached, pass);
-                }
-                return;
-            }
-
-            // Call for them
-            var caller = this.findCaller(METHOD);
-            var caller_type = this.getCallerType(caller);
-
-            // Ajax call
-            if (caller_type == 'ajax') {
-                $.ajax({
-                    'type': 'GET',
-                    'url': caller,
-                    'data': { 'defaults': JSON.stringify(defaults) },
-                    'dataType': 'json',
-                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
-                    'success': function (data) {
-                        for (var i = 0; i < data.length; i++) {
-                            this.mss.cacheItem(data[i]);
-                            this.mss.insertItem(data[i], false);
-                        }
-                        if (typeof this.handler == 'function') {
-                            this.handler(data, this.pass);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-
-            // Function call
-            } else if (caller_type == 'function') {
-                var wrap_handler = function(items, wrap_pass) {
-                    for (var i = 0; i < items.length; i++) {
-                        wrap_pass.mss.cacheItem(items[i]);
-                        wrap_pass.mss.insertItem(items[i], false);
-                    }
-                    if (typeof wrap_pass.handler == 'function') {
-                        wrap_pass.handler(items, wrap_pass.pass);
-                    }
-                };
-                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
-                caller(this.mss, METHOD, wrap_handler, wrap_pass, defaults);
-
-            // Pull from array
-            } else if (caller_type == 'array') {
-                var found = new Array;
-                for (var j = 0; j < defaults.length; j++) {
-                    var item;
-                    if (this.mss.hasCachedItem(defaults[j])) {
-                        item = this.mss.getCachedItem(defaults[j]);
-                    } else {
-                        item = this.mss.buildItemFromId(defaults[j]);
-                    }
-                    this.mss.insertItem(item, false);
-                    found.push(item);
-                }
-                if (typeof handler == 'function') {
-                    handler(found, pass);
-                }
-            }
-
-        },
-
-        // }}}
-        // {{{ callForAllItems()
-
-        /**
-         * Calls out for a list of all items
-         *
-         * @param  function  handler a function that handles the list of all items
-         *                           (args: item array, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForAllItems: function(handler, pass) {
-            var METHOD = 'AllItems';
-
-            // Already got them?
-            if (typeof this.mss.allItems != 'string') {
-                if (typeof handler == 'function') {
-                    handler(this.mss.allItems, pass);
-                }
-                return;
-            }
-
-            // Call for them
-            var caller = this.findCaller(METHOD);
-            var caller_type = this.getCallerType(caller);
-
-            // Ajax call
-            if (caller_type == 'ajax') {
-                $.ajax({
-                    'type': 'GET',
-                    'url': caller,
-                    'data': { 'all': true },
-                    'dataType': 'json',
-                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
-                    'success': function (data) {
-                        this.mss.setAllItems(data);
-                        if (typeof this.handler == 'function') {
-                            this.handler(data, this.pass);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-
-            // Function call
-            } else if (caller_type == 'function') {
-                var wrap_handler = function(items, wrap_pass) {
-                    wrap_pass.mss.setAllItems(items);
-                    if (typeof wrap_pass.handler == 'function') {
-                        wrap_pass.handler(items, wrap_pass.pass);
-                    }
-                };
-                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
-                caller(this.mss, METHOD, wrap_handler, wrap_pass);
-
-            // Pull from array
-            } else if (caller_type == 'array') {
-                this.mss.setAllItems(caller);
-                if (typeof handler == 'function') {
-                    handler(caller, pass);
-                }
-            }
-        },
-
-        // }}}
-        // {{{ callForFeaturedItems()
-
-        /**
-         * Calls out for a list of featured items
-         *
-         * @param  function  handler a function that handles the list of all items
-         *                           (args: item array, pass object)
-         * @param  object    pass    an object containing anything the function
-         *                           needs passed to it
-         * @throws exception if the handler is not a function
-         */
-        callForFeaturedItems: function(handler, pass) {
-            var METHOD = 'FeaturedItems';
-
-            // Call for them
-            var caller = this.findCaller(METHOD);
-            var caller_type = this.getCallerType(caller);
-
-            // Ajax call
-            if (caller_type == 'ajax') {
-                $.ajax({
-                    'type': 'GET',
-                    'url': caller,
-                    'data': { 'featured': true },
-                    'dataType': 'json',
-                    'context': { mss: this.mss, call: METHOD, pass: pass, handler: handler },
-                    'success': function (data) {
-                        this.mss.setFeaturedItems(data);
-                        if (typeof this.handler == 'function') {
-                            this.handler(data, this.pass);
-                        }
-                    },
-                    'error': this.handleAjaxError
-                });
-
-            // Function call
-            } else if (caller_type == 'function') {
-                var wrap_handler = function(items, wrap_pass) {
-                    wrap_pass.mss.setFeaturedItems(items);
-                    if (typeof wrap_pass.handler == 'function') {
-                        wrap_pass.handler(items, wrap_pass.pass);
-                    }
-                };
-                var wrap_pass = { mss: this.mss, handler: handler, pass: pass };
-                caller(this.mss, METHOD, wrap_handler, wrap_pass);
-
-            // Pull from array
-            } else if (caller_type == 'array') {
-                this.mss.setFeaturedItems(caller);
-                if (typeof handler == 'function') {
-                    handler(caller, pass);
-                }
-            }
-        }
 
         // }}}
 
@@ -1613,9 +1968,12 @@
             var $s = mss.$entry.find('select');
             var id = $s.val();
             if (id) {
-                mss.backend.callForItemById(id, function (item, pass) {
-                    pass.mss.insertItem(item, true);
-                }, { mss: mss, update: true });
+                mss.backend.makeCall('item_by_id', {
+                    handler: function (item, pass) {
+                        pass.mss.insertItem(item, true);
+                    },
+                    pass: { mss: mss, update: true }
+                });
             }
             $s.val('');
         }
@@ -1684,11 +2042,14 @@
             if (this.mss.opts.allow_new) {
                 this.addSelectOption(this.mss.buildPlaceholderFromEntry('', this.opts.new_label), $entry.find('select'));
             }
-            this.mss.backend.callForAllItems(function (items, pass) {
-                for (var i = 0; i < items.length; i++) {
-                    pass.entry.addSelectOption(items[i], pass.$select);
-                }
-            }, { entry: this, $select: $entry.find('select') });
+            this.mss.backend.makeCall('all_items', {
+                handler: function (items, pass) {
+                    for (var i = 0; i < items.length; i++) {
+                        pass.entry.addSelectOption(items[i], pass.$select);
+                    }
+                },
+                pass: { entry: this, $select: $entry.find('select') }
+            });
             return $entry;
         },
 
@@ -1923,12 +2284,13 @@
          */
         toggle: function() {
             if (!this.fetchedAll) {
-                var handler = function (items, pass) {
-                    pass.widget.fetchedAll = true;
-                    pass.widget.toggle();
-                };
-                var pass = { widget: this };
-                this.mss.backend.callForAllItems(handler, pass);
+                this.mss.backend.makeCall('all_items', {
+                    handler: function (items, pass) {
+                        pass.widget.fetchedAll = true;
+                        pass.widget.toggle();
+                    },
+                    pass: { widget: this }
+                });
                 return;
             }
             if (!this.builtShowAll) {

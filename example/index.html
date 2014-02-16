@@ -73,7 +73,7 @@
             $('#my-featured-elem').multisortselect({
                 backend: {
                     call_all: programming_langugages,
-                    call_FeaturedItems: function (mss, method, handler, pass) {
+                    call_featured: function (params, call_type, callback, callback_vars, mss) {
                         var featured = new Array;
                         for (var i = 0; i < programming_langugages.length; i++) {
                             if (programming_langugages[i].label.match(/javascript/i)
@@ -86,7 +86,7 @@
                                 featured.push(programming_langugages[i]);
                             }
                         }
-                        handler(featured, pass);
+                        callback({ 'items': featured}, callback_vars);
                     }
                 },
                 show_featured: true
