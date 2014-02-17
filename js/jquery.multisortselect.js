@@ -1187,11 +1187,13 @@
          * @param bool update whether to update the value
          */
         insertItemById: function(iid, update) {
-            var handler = function (item, pass) {
-                pass.mss.insertItem(item, pass.update);
-            };
-            var pass = { mss: this, update: update };
-            this.backend.makeCall('item_by_id', { iid: iid });
+            this.backend.makeCall('item_by_id', {
+                iid: iid,
+                handler: function (item, pass) {
+                    pass.mss.insertItem(item, pass.update);
+                },
+                pass: { mss: this, update: update }
+            });
         },
 
         // }}}
